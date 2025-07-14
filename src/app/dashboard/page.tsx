@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -65,7 +66,6 @@ export default function DashboardPage() {
 
   // Welcome typing animation (word by word + blinking cursor)
   const [typedWords, setTypedWords] = useState<string[]>([]);
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [showCursor, setShowCursor] = useState(true);
 
   // Inactivity logout timer ref
@@ -111,7 +111,6 @@ export default function DashboardPage() {
     const fullText = `Hello ${user.name}, welcome back!`;
     const words = fullText.split(' ');
     setTypedWords([]);
-    setCurrentWordIndex(0);
 
     let idx = 0;
     const interval = setInterval(() => {
@@ -132,63 +131,13 @@ export default function DashboardPage() {
     };
   }, [user]);
 
-  // Dark mode toggle handler
-  const toggleDarkMode = useCallback(() => {
-    setDarkMode((prev) => {
-      const newMode = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('darkMode', newMode.toString());
-        if (newMode) document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
-      }
-      return newMode;
-    });
-  }, []);
-
-  // Save name handler with simple validation
-  const saveName = () => {
-    if (!nameInput.trim()) {
-      toast.error('Name cannot be empty');
-      return;
-    }
-    setUser((prev) => prev && { ...prev, name: nameInput.trim() });
-    setEditingName(false);
-    toast.success('Name updated');
-  };
-
-  // Avatar upload handler
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload a valid image file');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatarPreview(reader.result as string);
-      // Here you can also upload the avatar to server or save locally
-      toast.success('Avatar updated (locally)');
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Reset avatar preview
-  const resetAvatar = () => {
-    setAvatarPreview(null);
-    // Also reset on user object if needed
-    toast.info('Avatar reset to default');
-  };
-
   // Handle logout logic + timer
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.clear();
     sessionStorage.clear();
     toast.success('Logged out');
     setTimeout(() => router.push('/login'), 1000);
-  };
+  }, [router]);
 
   // Reset inactivity timer
   const resetInactivityTimer = useCallback(() => {
@@ -211,7 +160,7 @@ export default function DashboardPage() {
         return c - 1;
       });
     }, 1000);
-  }, []);
+  }, [handleLogout]);
 
   // Setup inactivity timer on mount + event listeners for user activity
   useEffect(() => {
@@ -231,6 +180,54 @@ export default function DashboardPage() {
       if (countdownInterval.current) clearInterval(countdownInterval.current);
     };
   }, [resetInactivityTimer]);
+
+  // Dark mode toggle handler
+  const toggleDarkMode = useCallback(() => {
+    setDarkMode((prev) => {
+      const newMode = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('darkMode', newMode.toString());
+        if (newMode) document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      }
+      return newMode;
+    });
+  }, []);
+
+  // Save name handler with simple validation
+  const saveName = () => {
+    if (!nameInput.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+    setUser((prev) => (prev ? { ...prev, name: nameInput.trim() } : prev));
+    setEditingName(false);
+    toast.success('Name updated');
+  };
+
+  // Avatar upload handler
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload a valid image file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarPreview(reader.result as string);
+      toast.success('Avatar updated (locally)');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Reset avatar preview
+  const resetAvatar = () => {
+    setAvatarPreview(null);
+    toast.info('Avatar reset to default');
+  };
 
   // Filter actions by search term
   const filteredActions = ACTIONS.filter(({ label }) =>
@@ -312,7 +309,7 @@ export default function DashboardPage() {
                   onClick={() => router.push(href)}
                   className={clsx(
                     'flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-gray-700 dark:text-gray-300 hover:bg-indigo-100 dark:hover:bg-indigo-800 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full',
-                    sidebarCollapsed && 'justify-center',
+                    sidebarCollapsed && 'justify-center'
                   )}
                   aria-label={label}
                   title={label}
@@ -327,7 +324,7 @@ export default function DashboardPage() {
                 onClick={() => setLogoutModalOpen(true)}
                 className={clsx(
                   'flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-red-600 hover:bg-red-100 dark:hover:bg-red-900 transition focus:outline-none focus:ring-2 focus:ring-red-600 w-full',
-                  sidebarCollapsed && 'justify-center',
+                  sidebarCollapsed && 'justify-center'
                 )}
                 aria-label="Logout"
                 title="Logout"
@@ -376,11 +373,14 @@ export default function DashboardPage() {
           >
             <div className="inline-block bg-indigo-100 dark:bg-indigo-900 rounded-full p-6 mb-5 select-none relative">
               {avatarPreview ? (
-                <img
+                <Image
                   src={avatarPreview}
-                  alt={`${user.name}'s avatar`}
-                  className="w-24 h-24 rounded-full object-cover"
+                  alt={`${user.name}&quot;s avatar`}
+                  width={96}
+                  height={96}
+                  className="rounded-full object-cover"
                   draggable={false}
+                  unoptimized
                 />
               ) : (
                 <span className="text-indigo-600 dark:text-indigo-300 text-6xl font-extrabold select-text">
@@ -473,126 +473,105 @@ export default function DashboardPage() {
                 <p className="text-sm text-indigo-600 dark:text-indigo-300">Resumes Created</p>
               </div>
               <div className="bg-indigo-50 dark:bg-indigo-900 rounded-xl p-4 shadow flex flex-col items-center">
-                <span className="text-indigo-600 dark:text-indigo-300 text-4xl mb-2">🕒</span>
-                <p className="font-semibold text-indigo-700 dark:text-indigo-400">Last login:</p>
-                <p className="text-sm text-indigo-600 dark:text-indigo-300">2 days ago</p>
+                <span className="text-indigo-600 dark:text-indigo-300 text-4xl mb-2">⭐</span>
+                <p className="font-semibold text-indigo-700 dark:text-indigo-400">12</p>
+                <p className="text-sm text-indigo-600 dark:text-indigo-300">Job Applications</p>
               </div>
               <div className="bg-indigo-50 dark:bg-indigo-900 rounded-xl p-4 shadow flex flex-col items-center">
-                <span className="text-indigo-600 dark:text-indigo-300 text-4xl mb-2">⭐</span>
-                <p className="font-semibold text-indigo-700 dark:text-indigo-400">Premium User</p>
-                <p className="text-sm text-indigo-600 dark:text-indigo-300">Active</p>
+                <span className="text-indigo-600 dark:text-indigo-300 text-4xl mb-2">🕒</span>
+                <p className="font-semibold text-indigo-700 dark:text-indigo-400">8</p>
+                <p className="text-sm text-indigo-600 dark:text-indigo-300">Interviews Scheduled</p>
               </div>
             </div>
           </section>
         )}
 
-        {/* Search filter for actions */}
-        <div className="mb-8 max-w-md mx-auto">
+        {/* Actions Search */}
+        <section className="max-w-xl mx-auto mb-10">
           <input
             type="search"
-            placeholder="Search tools..."
+            placeholder="Search actions..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-100"
-            aria-label="Search dashboard tools"
+            className="w-full px-4 py-2 rounded border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-100"
+            aria-label="Search dashboard actions"
           />
-        </div>
-
-        {/* Action cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredActions.length > 0 ? (
-            filteredActions.map(({ key, label, icon, description, href, color }) => (
-              <motion.button
-                key={key}
-                onClick={() => router.push(href)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={clsx(
-                  'flex flex-col items-start p-6 rounded-2xl shadow-lg text-white font-semibold focus:outline-none focus:ring-4',
-                  color,
-                )}
-                aria-label={label}
-                title={description}
-              >
-                <span className="text-5xl mb-4">{icon}</span>
-                <span className="text-xl">{label}</span>
-                <span className="text-sm opacity-90 mt-2">{description}</span>
-              </motion.button>
-            ))
-          ) : (
-            <p className="text-center text-gray-500 dark:text-gray-400 col-span-full">
-              No tools found for "{searchTerm}"
-            </p>
-          )}
-
-          {/* Placeholder for future tools */}
-          <motion.div
-            className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-gray-400 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed select-none"
-            whileHover={{ scale: 1.03 }}
-            title="More tools coming soon"
-          >
-            <span className="text-6xl mb-4">⚙️</span>
-            <span className="text-lg font-semibold">More tools coming soon...</span>
-          </motion.div>
         </section>
 
-        {/* Logout Confirmation Modal */}
-        <AnimatePresence>
-          {logoutModalOpen && (
-            <motion.div
-              className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              aria-modal="true"
-              role="dialog"
-              aria-labelledby="logout-dialog-title"
-              aria-describedby="logout-dialog-desc"
-              tabIndex={-1}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setLogoutModalOpen(false);
-              }}
-            >
-              <motion.div
-                className="bg-white dark:bg-gray-900 rounded-xl p-8 max-w-sm w-full shadow-lg outline-none"
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.8 }}
-                role="document"
-              >
-                <h3
-                  id="logout-dialog-title"
-                  className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4"
-                >
-                  Confirm Logout
-                </h3>
-                <p id="logout-dialog-desc" className="text-gray-600 dark:text-gray-300 mb-6">
-                  You will be logged out automatically in{' '}
-                  <strong>{countdown} second{countdown !== 1 ? 's' : ''}</strong>. Do you want to logout
-                  now?
-                </p>
-                <div className="flex justify-end gap-4">
-                  <button
-                    onClick={() => setLogoutModalOpen(false)}
-                    className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                    autoFocus
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      setLogoutModalOpen(false);
-                      handleLogout();
-                    }}
-                    className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                  >
-                    Logout
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
+        {/* Actions List */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          {filteredActions.length === 0 && (
+            <p className="text-center col-span-full text-gray-500 dark:text-gray-400">
+              No actions found.
+            </p>
           )}
-        </AnimatePresence>
+          {filteredActions.map(({ key, label, icon, description, href, color }) => (
+            <motion.button
+              key={key}
+              onClick={() => router.push(href)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={clsx(
+                color,
+                'text-white rounded-xl shadow-lg p-6 flex flex-col items-start focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-700 transition'
+              )}
+              aria-label={label}
+              title={label}
+              type="button"
+            >
+              <span className="text-4xl mb-3">{icon}</span>
+              <h3 className="text-xl font-semibold">{label}</h3>
+              <p className="mt-1 text-sm">{description}</p>
+            </motion.button>
+          ))}
+        </section>
+
+      {/* Logout confirmation modal */}
+      <AnimatePresence>
+        {logoutModalOpen && (
+          <motion.div
+            key="logout-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-modal-title"
+          >
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6 text-center"
+            >
+              <h2 id="logout-modal-title" className="text-2xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                You&apos;re about to be logged out due to inactivity
+              </h2>
+              <p className="mb-6 text-gray-700 dark:text-gray-300">
+                Logging out in <strong>{countdown}</strong> second{countdown !== 1 ? 's' : ''}.
+              </p>
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => {
+                    setLogoutModalOpen(false);
+                    resetInactivityTimer();
+                  }}
+                  className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-green-500 transition"
+                >
+                  Stay Logged In
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                >
+                  Logout Now
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       </main>
     </div>
   );

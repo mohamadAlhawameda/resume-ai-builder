@@ -1,7 +1,39 @@
 // components/resumeTemplates/ClassicTemplate.tsx
 import React from "react";
 
-export default function ClassicTemplate({ data }) {
+type EducationItem = {
+  degree?: string;
+  school?: string;
+  from?: string;
+  to?: string;
+};
+
+type ExperienceItem = {
+  role?: string;
+  company?: string;
+  from?: string;
+  to?: string;
+  description?: string;
+};
+
+type ResumeData = {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  linkedIn?: string;
+  github?: string;
+  isDeveloper?: boolean;
+  summary?: string;
+  education?: EducationItem[];
+  experience?: ExperienceItem[];
+  skills?: string[];
+};
+
+type Props = {
+  data: ResumeData;
+};
+
+export default function ClassicTemplate({ data }: Props) {
   return (
     <>
       <header className="mb-8 border-b-2 border-black pb-2">
@@ -42,7 +74,7 @@ export default function ClassicTemplate({ data }) {
             Education
           </h2>
           <ul className="list-disc pl-5">
-            {data.education.map((edu, i) => (
+            {data.education.map((edu: EducationItem, i: number) => (
               <li key={i} className="mb-2">
                 <span className="font-semibold">{edu.degree || "Degree"}</span> — {edu.school || "School"}
                 <br />
@@ -61,7 +93,7 @@ export default function ClassicTemplate({ data }) {
             Experience
           </h2>
           <ul className="list-disc pl-5">
-            {data.experience.map((exp, i) => (
+            {data.experience.map((exp: ExperienceItem, i: number) => (
               <li key={i} className="mb-4">
                 <span className="font-semibold">{exp.role || "Role"}</span>, {exp.company || "Company"}
                 <br />
@@ -79,7 +111,7 @@ export default function ClassicTemplate({ data }) {
         <section>
           <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">Skills</h2>
           <ul className="flex flex-wrap gap-3">
-            {data.skills.map((skill, i) => (
+            {data.skills.map((skill: string, i: number) => (
               <li
                 key={i}
                 className="border border-black rounded px-4 py-1 text-sm font-serif font-semibold"

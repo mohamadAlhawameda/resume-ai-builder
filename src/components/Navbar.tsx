@@ -10,7 +10,8 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
-  const isActive = (href) => pathname === href;
+  // Explicitly type href as string
+  const isActive = (href: string) => pathname === href;
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-md">

@@ -3,8 +3,22 @@
 import React from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { GraduationCap, XCircle } from "lucide-react";
-import { EducationEntry, EducationStepProps } from "@/types";
 import FloatingInput from "../ui/FloatingInput";
+
+// Local type definitions
+type EducationEntry = {
+  school: string;
+  degree: string;
+  from: string;
+  to: string;
+};
+
+type EducationStepProps = {
+  education: EducationEntry[];
+  onChange: (index: number, field: keyof EducationEntry, value: string) => void;
+  addItem: () => void;
+  removeItem: (index: number) => void;
+};
 
 export default function EducationStep({
   education,
@@ -14,12 +28,13 @@ export default function EducationStep({
 }: EducationStepProps) {
   const dragControls = useDragControls();
 
+  // Optional: handle reorder if you want to allow drag and drop reordering
   const handleReorder = (newOrder: EducationEntry[]) => {
     newOrder.forEach((item, i) => {
-      onChange("education", i, "school", item.school);
-      onChange("education", i, "degree", item.degree);
-      onChange("education", i, "from", item.from);
-      onChange("education", i, "to", item.to);
+      onChange(i, "school", item.school);
+      onChange(i, "degree", item.degree);
+      onChange(i, "from", item.from);
+      onChange(i, "to", item.to);
     });
   };
 
@@ -32,7 +47,7 @@ export default function EducationStep({
         </div>
         <button
           type="button"
-          onClick={() => addItem("education")}
+          onClick={addItem}
           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition"
         >
           + Add Education
@@ -65,14 +80,14 @@ export default function EducationStep({
               id={`school-${index}`}
               label="School Name"
               value={item.school}
-              onChange={(e) => onChange("education", index, "school", e.target.value)}
+              onChange={(e) => onChange(index, "school", e.target.value)}
             />
 
             <FloatingInput
               id={`degree-${index}`}
               label="Degree / Program"
               value={item.degree}
-              onChange={(e) => onChange("education", index, "degree", e.target.value)}
+              onChange={(e) => onChange(index, "degree", e.target.value)}
             />
 
             <div className="grid grid-cols-2 gap-4">
@@ -80,20 +95,20 @@ export default function EducationStep({
                 id={`from-${index}`}
                 label="Start Year"
                 value={item.from}
-                onChange={(e) => onChange("education", index, "from", e.target.value)}
+                onChange={(e) => onChange(index, "from", e.target.value)}
               />
 
               <FloatingInput
                 id={`to-${index}`}
                 label="End Year"
                 value={item.to}
-                onChange={(e) => onChange("education", index, "to", e.target.value)}
+                onChange={(e) => onChange(index, "to", e.target.value)}
               />
             </div>
 
             <button
               type="button"
-              onClick={() => removeItem("education", index)}
+              onClick={() => removeItem(index)}
               className="flex items-center gap-1 text-red-600 text-sm hover:underline hover:text-red-700 mt-1"
             >
               <XCircle className="w-4 h-4" /> Remove

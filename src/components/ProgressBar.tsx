@@ -2,7 +2,12 @@
 
 import React from "react";
 
-export default function ProgressBar({ step, totalSteps }) {
+type ProgressBarProps = {
+  step: number;
+  totalSteps: number;
+};
+
+export default function ProgressBar({ step, totalSteps }: ProgressBarProps) {
   const progress = ((step + 1) / totalSteps) * 100;
 
   return (

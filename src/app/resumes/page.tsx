@@ -3,10 +3,27 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+// Define the Resume type explicitly
+interface Resume {
+  _id: string;
+  title?: string;
+  updatedAt: string;
+  // Add other fields if needed
+}
+
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
 export default function ResumeDashboardPage() {
   const router = useRouter();
-  const [resumes, setResumes] = useState([]);
-  const [selectedResume, setSelectedResume] = useState(null);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [viewing, setViewing] = useState(false);
@@ -15,14 +32,14 @@ export default function ResumeDashboardPage() {
     const fetchResumes = async () => {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const res = await fetch('http://localhost:3001/resume/resumes', {
+        const res = await fetch('https://resume-ai-builder-esnw.onrender.com/resume/resumes', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
         if (!res.ok) throw new Error('Failed to fetch resumes');
-        const data = await res.json();
+        const data: Resume[] = await res.json(); // cast to Resume[]
         setResumes(data);
       } catch (err) {
         console.error('Error fetching resumes:', err);
@@ -34,34 +51,25 @@ export default function ResumeDashboardPage() {
     fetchResumes();
   }, []);
 
-  const handleView = async (id) => {
+  const handleView = async (id: string) => {
     setModalOpen(true);
     setViewing(true);
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const res = await fetch(`http://localhost:3001/resume/resumes/${id}`, {
+      const res = await fetch(`https://resume-ai-builder-esnw.onrender.com/resumes/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
       if (!res.ok) throw new Error('Failed to load resume');
-      const data = await res.json();
+      const data: Resume = await res.json();
       setSelectedResume(data);
     } catch (err) {
       console.error('Error loading resume:', err);
     } finally {
       setViewing(false);
     }
-  };
-
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   return (

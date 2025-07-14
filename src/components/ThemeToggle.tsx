@@ -3,7 +3,13 @@
 import React, { useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
 
-export default function ThemeToggle({ theme, setTheme }) {
+// Define the props interface
+interface ThemeToggleProps {
+  theme: "light" | "dark";
+  setTheme: (theme: "light" | "dark") => void;
+}
+
+export default function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
   useEffect(() => {
     document.documentElement.classList.remove("light", "dark");
     document.documentElement.classList.add(theme);

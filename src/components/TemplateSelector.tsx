@@ -9,7 +9,13 @@ const templates = [
   { id: "minimal", label: "Minimal" },
 ];
 
-export default function TemplateSelector({ template, setTemplate }) {
+// Define prop types
+type TemplateSelectorProps = {
+  template: string;
+  setTemplate: (value: string) => void;
+};
+
+export default function TemplateSelector({ template, setTemplate }: TemplateSelectorProps) {
   return (
     <div className="relative">
       <label className="text-sm font-medium mr-2 flex items-center">

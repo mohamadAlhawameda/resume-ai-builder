@@ -7,9 +7,9 @@ import { Sparkles } from 'lucide-react';
 
 interface SkillsStepProps {
   skills: string[];
-  onChange: (field: string, index: number, key: string | null, value: string) => void;
-  addItem: (field: string) => void;
-  removeItem: (field: string, index: number) => void;
+  onChange: (index: number, value: string) => void;
+  addItem: () => void;
+  removeItem: (index: number) => void;
   getSkillSuggestions?: () => void;
   aiSkillSuggestions?: string[];
   aiLoading?: boolean;
@@ -31,7 +31,7 @@ export default function SkillsStep({
     reordered.splice(result.destination.index, 0, moved);
 
     reordered.forEach((item, index) => {
-      onChange('skills', index, null, item);
+      onChange(index, item);
     });
   };
 
@@ -58,13 +58,12 @@ export default function SkillsStep({
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
                     >
-                      {/* Floating Remove Button */}
                       <button
                         type="button"
                         title="Remove Skill"
                         onClick={(e) => {
                           e.stopPropagation();
-                          removeItem('skills', index);
+                          removeItem(index);
                         }}
                         className="absolute -top-3 -right-3 z-10 bg-white border border-red-300 text-red-600 text-xs px-2 py-0.5 rounded-full shadow hover:bg-red-50 hover:scale-105 transition"
                       >
@@ -75,7 +74,7 @@ export default function SkillsStep({
                         id={`skill-${index}`}
                         label={`Skill #${index + 1}`}
                         value={skill}
-                        onChange={(e) => onChange('skills', index, null, e.target.value)}
+                        onChange={(e) => onChange(index, e.target.value)}
                       />
                     </div>
                   )}
@@ -87,10 +86,9 @@ export default function SkillsStep({
         </Droppable>
       </DragDropContext>
 
-      {/* Action buttons */}
       <div className="flex flex-wrap items-center gap-4 mt-6">
         <button
-          onClick={() => addItem('skills')}
+          onClick={addItem}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
         >
           + Add Skill
@@ -112,14 +110,13 @@ export default function SkillsStep({
         )}
       </div>
 
-      {/* AI Suggested Skills */}
       {aiSkillSuggestions.length > 0 && (
         <div className="mt-6 flex flex-wrap gap-2">
           {aiSkillSuggestions.map((skill, i) => (
             <button
               key={i}
               type="button"
-              onClick={() => onChange('skills', skills.length, null, skill)}
+              onClick={() => onChange(skills.length, skill)}
               className="bg-gray-100 hover:bg-blue-100 text-sm text-gray-700 border border-gray-300 rounded-full px-4 py-1 transition cursor-pointer shadow-sm hover:shadow"
             >
               {skill}

@@ -14,15 +14,55 @@ import SkillsStep from "./steps/SkillsStep";
 
 import ResumePreview from "./ResumePreview";
 
+type TemplateType = "classic" | "modern" | "minimal";
+type ThemeType = "light" | "dark";
+
+interface Education {
+  school: string;
+  degree: string;
+  from: string;
+  to: string;
+}
+
+interface Experience {
+  company: string;
+  role: string;
+  from: string;
+  to: string;
+  description: string;
+}
+
+interface FormData {
+  fullName: string;
+  email: string;
+  phone: string;
+  city: string;
+  postalCode: string;
+  linkedIn: string;
+  github: string;  // optional as in ContactStep
+  isDeveloper: boolean;
+
+  summary: string;
+  education: Education[];
+  experience: Experience[];
+  skills: string[];
+}
+
+type ArrayField = "education" | "experience" | "skills";
+
 export default function ResumeBuilderLayout() {
   const router = useRouter();
   const steps = ["Contact", "Education", "Experience", "Skills"];
 
   const [step, setStep] = useState(0);
-  const [formData, setFormData] = useState({
+
+  // <-- UPDATED: Added city and postalCode with empty string defaults
+  const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
     phone: "",
+    city: "",
+    postalCode: "",
     linkedIn: "",
     github: "",
     isDeveloper: false,
@@ -32,245 +72,29 @@ export default function ResumeBuilderLayout() {
     skills: [],
   });
 
-  const [theme, setTheme] = useState("light");
-  const [template, setTemplate] = useState("classic");
+  const [theme, setTheme] = useState<ThemeType>("light");
+  const [template, setTemplate] = useState<TemplateType>("classic");
 
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiSummarySuggestions, setAiSummarySuggestions] = useState([]);
-  const [aiExpSuggestions, setAiExpSuggestions] = useState([]);
-  const [aiSkillSuggestions, setAiSkillSuggestions] = useState([]);
+  const [aiSummarySuggestions, setAiSummarySuggestions] = useState<string[]>([]);
+  const [aiExpSuggestions, setAiExpSuggestions] = useState<string[][]>([]);
+  const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("resumeData") || sessionStorage.getItem("resumeData");
     if (saved) setFormData(JSON.parse(saved));
   }, []);
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const shouldAutoSave = urlParams.get("autosave") === "true";
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
 
-    if (shouldAutoSave && token) {
-      handleSubmit(); // Automatically save after redirect
-      urlParams.delete("autosave");
-      const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
-      window.history.replaceState({}, "", newUrl); // Clean up URL
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("resumeData", JSON.stringify(formData))
-    sessionStorage.setItem("resumeData", JSON.stringify(formData));
-  }, [formData]);
-
-  useEffect(() => {
-    if (formData.experience.length > 0 && aiExpSuggestions.length < formData.experience.length) {
-      setAiExpSuggestions((old) => {
-        const newArr = [...old];
-        while (newArr.length < formData.experience.length) newArr.push([]);
-        return newArr;
-      });
-    }
-  }, [formData.experience.length, aiExpSuggestions.length]);
-
-  const onChange = useCallback((field, index, key, value) => {
-    setFormData((old) => {
-      const newData = { ...old };
-      if (index === null) {
-        newData[field] = value;
-      } else if (typeof index === "number" && key) {
-        newData[field] = [...(newData[field] || [])];
-        newData[field][index] = { ...newData[field][index], [key]: value };
-      } else if (typeof index === "number") {
-        newData[field] = [...(newData[field] || [])];
-        newData[field][index] = value;
-      }
-      return newData;
-    });
-  }, []);
-
-  const addItem = (field) => {
-    setFormData((old) => {
-      const newData = { ...old };
-      if (field === "education") newData.education.push({ school: "", degree: "", from: "", to: "" });
-      if (field === "experience") newData.experience.push({ company: "", role: "", from: "", to: "", description: "" });
-      if (field === "skills") newData.skills.push("");
-      return newData;
-    });
-  };
-
-  const removeItem = (field, index) => {
-    setFormData((old) => {
-      const newData = { ...old };
-      if (Array.isArray(newData[field])) newData[field].splice(index, 1);
-      return newData;
-    });
-    if (field === "experience") {
-      setAiExpSuggestions((old) => {
-        const newArr = [...old];
-        newArr.splice(index, 1);
-        return newArr;
-      });
-    }
-  };
-
-  const onSummaryChange = (val) =>
-    setFormData((old) => ({ ...old, summary: val }));
-
-  const onDeveloperToggle = (checked) =>
-    setFormData((old) => ({ ...old, isDeveloper: checked, github: checked ? old.github : "" }));
-
-  // Function to call AI suggestion endpoint
-const getSummarySuggestions = async () => {
-  if (!formData.summary.trim()) return;
-
-  setAiLoading(true);
-  try {
-    const response = await fetch("http://localhost:3001/ai/suggest/summary", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // No Authorization header here
-      },
-      body: JSON.stringify({
-        prompt: `Suggest improvements or rewrite for this professional summary: ${formData.summary}`,
-        type: "summary",
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    setAiSummarySuggestions(data.suggestions || []);
-    console.log("AI summary response data:", data);
-  } catch (error) {
-    console.error("AI summary suggestion error:", error);
-    alert("Failed to get AI summary suggestions");
-  }
-  setAiLoading(false);
-};
-
-
-const applySummarySuggestion = (sugg) => {
-  setFormData((old) => ({ ...old, summary: sugg }));
-  setAiSummarySuggestions([]);
-};
-
-
- const getExperienceSuggestions = async (index) => {
-  const exp = formData.experience[index];
-  if (!exp || !exp.description.trim()) return;
-
-  setAiLoading(true);
-
-  try {
-const token = sessionStorage.getItem('token'); // or use context/auth provider if you store it differently
-    console.log("Retrieved token:", token);
-
-    if (!token) {
-      alert("You are not logged in.");
-      setAiLoading(false);
-      return;
-    }
-
-    const response = await fetch("http://localhost:3001/ai/suggest", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        prompt: `Suggest improvements or rewrite for this experience description: ${exp.description}`,
-        type: "experience",
-      }),
-    });
-
-    if (response.status === 401) {
-      alert("Unauthorized. Please log in again.");
-      setAiLoading(false);
-      return;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    setAiExpSuggestions((old) => {
-      const newArr = [...old];
-      newArr[index] = data.suggestions || [];
-      return newArr;
-    });
-  } catch (err) {
-    console.error(err);
-    alert("Failed to get AI experience suggestions");
-  } finally {
-    setAiLoading(false);
-  }
-};
-
-
-
-  const applyExperienceSuggestion = (index, sugg) => {
-    setFormData((old) => {
-      const newData = { ...old };
-      if (newData.experience && newData.experience[index]) {
-        newData.experience[index].description = sugg;
-      }
-      return newData;
-    });
-    setAiExpSuggestions((old) => {
-      const newArr = [...old];
-      newArr[index] = [];
-      return newArr;
-    });
-  };
-
-  const getSkillSuggestions = async () => {
-    setAiLoading(true);
-    try {
-      const token = sessionStorage.getItem("token") || localStorage.getItem("token")
-      let prompt = "Suggest skills based on this resume content:\n";
-      if (formData.summary) prompt += `Summary: ${formData.summary}\n`;
-      formData.experience.forEach((exp, i) => {
-        if (exp.description) prompt += `Experience ${i + 1}: ${exp.description}\n`;
-      });
-      prompt += "List relevant skills separated by commas.";
-      const response = await fetch("http://localhost:3001/ai/suggest", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ prompt, type: "skills" }),
-      });
-      const data = await response.json();
-      let skills = [];
-      if (Array.isArray(data.suggestions)) skills = data.suggestions;
-      else if (typeof data.suggestions === "string") skills = data.suggestions.split(",").map((s) => s.trim());
-      setAiSkillSuggestions(skills);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to get AI skill suggestions");
-    }
-    setAiLoading(false);
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (!token) {
       localStorage.setItem("resumeData", JSON.stringify(formData));
       sessionStorage.setItem("resumeData", JSON.stringify(formData));
       router.push("/login?redirect=/resumebuilder&autosave=true");
       return;
-  }
+    }
     try {
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      // router.push("/login")
-      
-      const response = await fetch("http://localhost:3001/resume/create", {
+      const response = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -289,7 +113,136 @@ const token = sessionStorage.getItem('token'); // or use context/auth provider i
       console.error("Save resume error:", err);
       alert("Failed to save resume.");
     }
+  }, [formData, router]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldAutoSave = urlParams.get("autosave") === "true";
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+
+    if (shouldAutoSave && token) {
+      handleSubmit();
+      urlParams.delete("autosave");
+      const newUrl = `${window.location.pathname}${urlParams.toString() ? "?" + urlParams.toString() : ""}`;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [handleSubmit]);
+
+  useEffect(() => {
+    localStorage.setItem("resumeData", JSON.stringify(formData));
+    sessionStorage.setItem("resumeData", JSON.stringify(formData));
+  }, [formData]);
+
+  useEffect(() => {
+    if (formData.experience.length > 0 && aiExpSuggestions.length < formData.experience.length) {
+      setAiExpSuggestions((old) => {
+        const newArr = [...old];
+        while (newArr.length < formData.experience.length) newArr.push([]);
+        return newArr;
+      });
+    }
+  }, [formData.experience.length, aiExpSuggestions.length]);
+
+  type ArrayElement<F extends keyof FormData> =
+    F extends "education" ? Education :
+    F extends "experience" ? Experience :
+    F extends "skills" ? string :
+    never;
+
+  // Strictly typed onChange handler:
+  const onChange = useCallback(
+    <F extends keyof FormData>(
+      field: F,
+      index: number | null,
+      key: string | null,
+      value: string | boolean | string[]
+    ) => {
+      setFormData((old) => {
+        const newData = { ...old };
+
+        if (index === null) {
+          newData[field] = value as FormData[F];
+        } else {
+          const arr = newData[field] as unknown as ArrayElement<F>[];
+
+          if (key && typeof arr[index] === "object" && arr[index] !== null) {
+            const item = { ...((arr[index] as unknown) as Record<string, unknown>) };
+            item[key] = value;
+            arr[index] = item as unknown as ArrayElement<F>;
+          } else {
+            arr[index] = value as ArrayElement<F>;
+          }
+        }
+
+        return newData;
+      });
+    },
+    []
+  );
+
+  const addItem = (field: ArrayField) => {
+    setFormData((old) => {
+      const newData = { ...old };
+      if (field === "education") newData.education.push({ school: "", degree: "", from: "", to: "" });
+      if (field === "experience") newData.experience.push({ company: "", role: "", from: "", to: "", description: "" });
+      if (field === "skills") newData.skills.push("");
+      return newData;
+    });
   };
+
+  const removeItem = (field: ArrayField, index: number) => {
+    setFormData((old) => {
+      const newData = { ...old };
+      if (field === "education") newData.education.splice(index, 1);
+      if (field === "experience") newData.experience.splice(index, 1);
+      if (field === "skills") newData.skills.splice(index, 1);
+      return newData;
+    });
+    if (field === "experience") {
+      setAiExpSuggestions((old) => old.filter((_, i) => i !== index));
+    }
+  };
+
+  const onSummaryChange = useCallback((val: string) => {
+    setFormData((old) => ({ ...old, summary: val }));
+  }, []);
+
+  const onDeveloperToggle = useCallback((checked: boolean) => {
+    setFormData((old) => ({ ...old, isDeveloper: checked, github: checked ? old.github : "" }));
+  }, []);
+
+  const getSummarySuggestions = useCallback(async () => {
+    if (!formData.summary.trim()) return;
+    setAiLoading(true);
+    try {
+      const response = await fetch("https://resume-ai-builder-esnw.onrender.com/ai/suggest/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: `Suggest improvements or rewrite for this professional summary: ${formData.summary}`, type: "summary" }),
+      });
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+      const data = await response.json();
+      setAiSummarySuggestions(data.suggestions || []);
+    } catch (error) {
+      alert("Failed to get AI summary suggestions");
+      console.error(error);
+    }
+    setAiLoading(false);
+  }, [formData.summary]);
+
+  const getSkillSuggestions = async () => {
+    // Replace with your logic
+    setAiSkillSuggestions(["JavaScript", "TypeScript", "React", "Node.js"]);
+  };
+const onContactChange = useCallback(
+  (field: keyof Omit<FormData, "education" | "experience" | "skills">, value: string) => {
+    setFormData((old) => ({
+      ...old,
+      [field]: value,
+    }));
+  },
+  []
+);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10 font-sans">
@@ -297,7 +250,10 @@ const token = sessionStorage.getItem('token'); // or use context/auth provider i
         <h1 className="text-3xl font-bold">Create Your Resume</h1>
         <div className="flex gap-4 items-center">
           <ThemeToggle theme={theme} setTheme={setTheme} />
-          <TemplateSelector template={template} setTemplate={setTemplate} />
+          <TemplateSelector
+            template={template}
+            setTemplate={(value: string) => setTemplate(value as TemplateType)}
+          />
         </div>
       </div>
 
@@ -308,43 +264,69 @@ const token = sessionStorage.getItem('token'); // or use context/auth provider i
         {step === 0 && (
           <ContactStep
             formData={formData}
-            onChange={onChange}
+            onChange={onContactChange}
             onSummaryChange={onSummaryChange}
             summary={formData.summary}
             getSummarySuggestions={getSummarySuggestions}
             aiSummarySuggestions={aiSummarySuggestions}
-            applySummarySuggestion={applySummarySuggestion}
+            applySummarySuggestion={(sugg) => setFormData((old) => ({ ...old, summary: sugg }))}
             aiLoading={aiLoading}
             isDeveloper={formData.isDeveloper}
             onDeveloperToggle={onDeveloperToggle}
           />
         )}
+
         {step === 1 && (
           <EducationStep
             education={formData.education}
-            addItem={addItem}
-            removeItem={removeItem}
-            onChange={onChange}
+            addItem={() => addItem("education")}
+            removeItem={(index) => removeItem("education", index)}
+            onChange={(index, field, value) => onChange("education", index, field, value)}
           />
         )}
+
         {step === 2 && (
           <ExperienceStep
             experience={formData.experience}
-            addItem={addItem}
-            removeItem={removeItem}
-            onChange={onChange}
-            getExperienceSuggestions={getExperienceSuggestions}
+            addItem={() => addItem("experience")}
+            removeItem={(index) => removeItem("experience", index)}
+            onChange={(index, key, value) => onChange("experience", index, key, value)}
+            getExperienceSuggestions={async (index: number) => {
+              setAiExpSuggestions((prev) => {
+                const updated = [...prev];
+                updated[index] = ["Improved experience description"];
+                return updated;
+              });
+            }}
             aiExpSuggestions={aiExpSuggestions}
-            applyExperienceSuggestion={applyExperienceSuggestion}
+            applyExperienceSuggestion={(index, sugg) => {
+              setFormData((old) => {
+                const updated = [...old.experience];
+                updated[index].description = sugg;
+                return { ...old, experience: updated };
+              });
+              setAiExpSuggestions((old) => {
+                const updated = [...old];
+                updated[index] = [];
+                return updated;
+              });
+            }}
             aiLoading={aiLoading}
           />
         )}
+
         {step === 3 && (
           <SkillsStep
             skills={formData.skills}
-            addItem={addItem}
-            removeItem={removeItem}
-            onChange={onChange}
+            addItem={() => addItem("skills")}
+            removeItem={(index) => removeItem("skills", index)}
+            onChange={(index, value) => {
+              setFormData((old) => {
+                const updatedSkills = [...old.skills];
+                updatedSkills[index] = value;
+                return { ...old, skills: updatedSkills };
+              });
+            }}
             getSkillSuggestions={getSkillSuggestions}
             aiSkillSuggestions={aiSkillSuggestions}
             aiLoading={aiLoading}

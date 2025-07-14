@@ -21,13 +21,12 @@ interface ExperienceEntry {
 interface ExperienceStepProps {
   experience: ExperienceEntry[];
   onChange: (
-    field: string,
     index: number,
     key: keyof ExperienceEntry,
     value: string
   ) => void;
-  addItem: (field: string) => void;
-  removeItem: (field: string, index: number) => void;
+  addItem: () => void;
+  removeItem: (index: number) => void;
   getExperienceSuggestions?: (index: number) => void;
   applyExperienceSuggestion?: (index: number, suggestion: string) => void;
   aiExpSuggestions?: string[][];
@@ -52,18 +51,18 @@ export default function ExperienceStep({
     reordered.splice(result.destination.index, 0, moved);
 
     reordered.forEach((item, index) => {
-      onChange("experience", index, "company", item.company);
-      onChange("experience", index, "role", item.role);
-      onChange("experience", index, "from", item.from);
-      onChange("experience", index, "to", item.to);
-      onChange("experience", index, "description", item.description);
+      onChange(index, "company", item.company);
+      onChange(index, "role", item.role);
+      onChange(index, "from", item.from);
+      onChange(index, "to", item.to);
+      onChange(index, "description", item.description);
     });
   };
 
   return (
     <div>
       <button
-        onClick={() => addItem("experience")}
+        onClick={addItem}
         className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
       >
         + Add Experience
@@ -102,7 +101,7 @@ export default function ExperienceStep({
                         label="Company"
                         value={exp.company}
                         onChange={(e) =>
-                          onChange("experience", index, "company", e.target.value)
+                          onChange(index, "company", e.target.value)
                         }
                       />
 
@@ -110,9 +109,7 @@ export default function ExperienceStep({
                         id={`role-${index}`}
                         label="Role"
                         value={exp.role}
-                        onChange={(e) =>
-                          onChange("experience", index, "role", e.target.value)
-                        }
+                        onChange={(e) => onChange(index, "role", e.target.value)}
                       />
 
                       <div className="flex gap-4">
@@ -120,17 +117,13 @@ export default function ExperienceStep({
                           id={`from-${index}`}
                           label="From"
                           value={exp.from}
-                          onChange={(e) =>
-                            onChange("experience", index, "from", e.target.value)
-                          }
+                          onChange={(e) => onChange(index, "from", e.target.value)}
                         />
                         <FloatingInput
                           id={`to-${index}`}
                           label="To"
                           value={exp.to}
-                          onChange={(e) =>
-                            onChange("experience", index, "to", e.target.value)
-                          }
+                          onChange={(e) => onChange(index, "to", e.target.value)}
                         />
                       </div>
 
@@ -139,7 +132,7 @@ export default function ExperienceStep({
                         label="Description"
                         value={exp.description}
                         onChange={(e) =>
-                          onChange("experience", index, "description", e.target.value)
+                          onChange(index, "description", e.target.value)
                         }
                       />
 
@@ -159,7 +152,7 @@ export default function ExperienceStep({
 
                         <button
                           type="button"
-                          onClick={() => removeItem("experience", index)}
+                          onClick={() => removeItem(index)}
                           className="text-red-600 hover:underline text-sm"
                         >
                           Remove
@@ -174,17 +167,11 @@ export default function ExperienceStep({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (typeof sugg === "string") {
-                                  applyExperienceSuggestion?.(index, sugg);
-                                } else {
-                                  console.warn("Invalid suggestion type", sugg);
-                                }
+                                applyExperienceSuggestion?.(index, sugg);
                               }}
                               className="w-full text-left cursor-pointer bg-gray-100 p-2 rounded hover:bg-gray-200 transition"
                             >
-                              {typeof sugg === "string"
-                                ? sugg
-                                : "Invalid suggestion"}
+                              {sugg}
                             </button>
                           ))}
                         </div>

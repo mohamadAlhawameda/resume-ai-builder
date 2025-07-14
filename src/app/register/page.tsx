@@ -53,7 +53,7 @@ export default function AdvancedRegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:3001/auth/register', {
+      const res = await fetch('https://resume-ai-builder-esnw.onrender.com/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),

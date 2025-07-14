@@ -1,10 +1,20 @@
 import React from "react";
 import clsx from "clsx";
 
-export default function StepNavigation({ steps, currentStep, onStepChange }) {
+interface StepNavigationProps {
+  steps: string[];
+  currentStep: number;
+  onStepChange: (stepIndex: number) => void;
+}
+
+export default function StepNavigation({
+  steps,
+  currentStep,
+  onStepChange,
+}: StepNavigationProps) {
   return (
     <nav className="flex gap-3 mb-10">
-      {steps.map((label, i) => (
+      {steps.map((label: string, i: number) => (
         <button
           key={label}
           onClick={() => onStepChange(i)}
