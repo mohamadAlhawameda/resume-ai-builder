@@ -4,13 +4,15 @@ import React from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { GraduationCap, XCircle } from "lucide-react";
 import FloatingInput from "../ui/FloatingInput";
+import FloatingTextarea from "../ui/FloatingTextarea"; // Assuming you have this component
 
-// Local type definitions
+// Updated type with optional achievements
 type EducationEntry = {
   school: string;
   degree: string;
   from: string;
   to: string;
+  achievements?: string;  // <-- new optional field
 };
 
 type EducationStepProps = {
@@ -28,13 +30,13 @@ export default function EducationStep({
 }: EducationStepProps) {
   const dragControls = useDragControls();
 
-  // Optional: handle reorder if you want to allow drag and drop reordering
   const handleReorder = (newOrder: EducationEntry[]) => {
     newOrder.forEach((item, i) => {
       onChange(i, "school", item.school);
       onChange(i, "degree", item.degree);
       onChange(i, "from", item.from);
       onChange(i, "to", item.to);
+      onChange(i, "achievements", item.achievements || "");
     });
   };
 
@@ -105,6 +107,14 @@ export default function EducationStep({
                 onChange={(e) => onChange(index, "to", e.target.value)}
               />
             </div>
+
+            {/* New optional achievements field */}
+            <FloatingTextarea
+              id={`achievements-${index}`}
+              label="Achievements (optional)"
+              value={item.achievements || ""}
+              onChange={(e) => onChange(index, "achievements", e.target.value)}
+            />
 
             <button
               type="button"
