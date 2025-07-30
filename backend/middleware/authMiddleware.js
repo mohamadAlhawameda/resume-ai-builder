@@ -11,7 +11,8 @@ export default function authMiddleware(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = { userId: decoded.userId }; // attach decoded user info to req
     next();
-  } catch (err) {
-    res.status(401).json({ message: 'Token is not valid' });
-  }
+ } catch (err) {
+  console.error("JWT verification failed:", err);
+  res.status(401).json({ message: "Token is not valid" });
+}
 }
