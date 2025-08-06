@@ -5,7 +5,7 @@ type EducationItem = {
   school?: string;
   from?: string;
   to?: string;
-  achievements?: string; // newline-separated
+  achievements?: string;
 };
 
 type ExperienceItem = {
@@ -30,16 +30,16 @@ type ResumeData = {
 };
 
 type Props = {
-  data: ResumeData;
+  data?: ResumeData;
 };
 
 function renderBullets(text?: string) {
-  if (!text) return null;
+  if (!text || typeof text !== "string" || text.trim().length === 0) return null;
 
   const lines = text
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .filter(Boolean);
 
   return (
     <ul className="list-disc pl-6 mt-1 space-y-1">
@@ -53,12 +53,12 @@ function renderBullets(text?: string) {
 }
 
 function renderAchievements(text?: string) {
-  if (!text) return null;
+  if (!text || typeof text !== "string" || text.trim().length === 0) return null;
 
   const lines = text
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .filter(Boolean);
 
   return (
     <ul className="list-disc pl-6 mt-2 space-y-1">
@@ -77,10 +77,12 @@ export default function ClassicTemplate({ data }: Props) {
     <>
       {/* Header */}
       <header className="mb-8 border-b-2 border-black pb-2">
-        <h1 className="text-4xl font-serif font-bold">{data.fullName || "Your Name"}</h1>
+        <h1 className="text-4xl font-serif font-bold">
+          {data?.fullName ?? "Your Name"}
+        </h1>
         <p className="text-base font-serif italic mt-1">
-          {data.email || "email@example.com"} | {data.phone || "Phone Number"} |{" "}
-          {data.linkedIn ? (
+          {data?.email ?? "email@example.com"} | {data?.phone ?? "Phone Number"} |{" "}
+          {data?.linkedIn ? (
             <a
               href={data.linkedIn}
               className="underline text-blue-700"
@@ -92,7 +94,7 @@ export default function ClassicTemplate({ data }: Props) {
           ) : (
             "LinkedIn"
           )}
-          {data.isDeveloper && data.github && (
+          {data?.isDeveloper && data?.github && (
             <>
               {" "}
               |{" "}
@@ -110,17 +112,19 @@ export default function ClassicTemplate({ data }: Props) {
       </header>
 
       {/* Summary */}
-      {data.summary && (
+      {data?.summary && typeof data.summary === "string" && data.summary.trim() && (
         <section className="mb-8">
           <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
             Professional Summary
           </h2>
-          <p className="whitespace-pre-line text-sm leading-relaxed">{data.summary}</p>
+          <p className="whitespace-pre-line text-sm leading-relaxed">
+            {data.summary}
+          </p>
         </section>
       )}
 
       {/* Education */}
-      {data.education && data.education.length > 0 && (
+      {Array.isArray(data?.education) && data.education.length > 0 && (
         <section className="mb-8">
           <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
             Education
@@ -130,10 +134,11 @@ export default function ClassicTemplate({ data }: Props) {
               <div key={i} className="text-sm">
                 <div className="flex justify-between font-semibold">
                   <span>
-                    {edu.degree || "Degree"}, {edu.school || "School"}
+                    {edu.degree ?? "Degree"},{" "}
+                    {edu.school ?? "School"}
                   </span>
                   <span className="italic text-sm text-gray-600">
-                    {edu.from || "Start"} – {edu.to || "End"}
+                    {edu.from ?? "Start"} – {edu.to ?? "End"}
                   </span>
                 </div>
                 {renderAchievements(edu.achievements)}
@@ -144,7 +149,7 @@ export default function ClassicTemplate({ data }: Props) {
       )}
 
       {/* Experience */}
-      {data.experience && data.experience.length > 0 && (
+      {Array.isArray(data?.experience) && data.experience.length > 0 && (
         <section className="mb-8">
           <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
             Experience
@@ -153,9 +158,11 @@ export default function ClassicTemplate({ data }: Props) {
             {data.experience.map((exp, i) => (
               <div key={i} className="text-sm">
                 <div className="flex justify-between font-semibold">
-                  <span>{exp.role || "Role"}, {exp.company || "Company"}</span>
+                  <span>
+                    {exp.role ?? "Role"}, {exp.company ?? "Company"}
+                  </span>
                   <span className="italic text-sm text-gray-600">
-                    {exp.from || "Start"} – {exp.to || "End"}
+                    {exp.from ?? "Start"} – {exp.to ?? "End"}
                   </span>
                 </div>
                 {renderBullets(exp.description)}
@@ -165,32 +172,30 @@ export default function ClassicTemplate({ data }: Props) {
         </section>
       )}
 
-     {/* Skills */}
-{data.skills && data.skills.length > 0 && (
-  <section className="mb-8">
-    <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
-      Skills
-    </h2>
-    <ul className="grid grid-cols-3 gap-y-1 pl-4 text-sm list-disc list-inside">
-      {data.skills.map((skill, i) => (
-        <li
-          key={i}
-          className={
-            i % 3 === 0
-              ? "text-left"
-              : i % 3 === 1
-              ? "text-center"
-              : "text-right"
-          }
-        >
-          {skill}
-        </li>
-      ))}
-    </ul>
-  </section>
-)}
-
-
+      {/* Skills */}
+      {Array.isArray(data?.skills) && data.skills.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
+            Skills
+          </h2>
+          <ul className="grid grid-cols-3 gap-y-1 pl-4 text-sm list-disc list-inside">
+            {data.skills.map((skill, i) => (
+              <li
+                key={i}
+                className={
+                  i % 3 === 0
+                    ? "text-left"
+                    : i % 3 === 1
+                    ? "text-center"
+                    : "text-right"
+                }
+              >
+                {skill}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }
