@@ -15,7 +15,7 @@ import SkillsStep from "./steps/SkillsStep";
 import ResumePreview from "./ResumePreview";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
-import html2pdf from "html2pdf.js";
+import { useParams } from "next/navigation";
 
 type TemplateType = "classic" | "modern" | "minimal";
 
@@ -51,7 +51,7 @@ interface FormData {
 
 type ArrayField = "education" | "experience" | "skills";
 
-export default function ResumeBuilderLayout() {
+export default function ResumeBuilderLayout({ mode = "create" }: { mode?: "create" | "edit" }) {
   const router = useRouter();
   const steps = ["Contact", "Education", "Experience", "Skills"];
   const previewRef = useRef<HTMLDivElement>(null);
@@ -79,6 +79,9 @@ export default function ResumeBuilderLayout() {
   const [aiExpSuggestions, setAiExpSuggestions] = useState<string[][]>([]);
   const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
 
+
+const { id } = useParams();
+const resumeId = Array.isArray(id) ? id[0] : id;
   useEffect(() => {
     const saved = localStorage.getItem("resumeData") || sessionStorage.getItem("resumeData");
     if (saved) setFormData(JSON.parse(saved));
@@ -103,73 +106,34 @@ export default function ResumeBuilderLayout() {
   }
 }, [formData, template]);
 
+useEffect(() => {
+  if (mode === "edit" && resumeId) {
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (!token) return;
 
-// const handleSubmit = useCallback(async () => {
-//   const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    fetch(`https://resume-ai-builder-esnw.onrender.com/resume/resumes/${resumeId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.data) {
+          setFormData(data.data); // load the resume fields
+          if (data.templateId) setTemplate(data.templateId); // optional: load correct template too
+        }
+      })
+      .catch(err => console.error("Failed to load resume:", err));
+  }
+}, [mode, resumeId]);
 
-//   // Save data locally
-//   localStorage.setItem("resumeData", JSON.stringify(formData));
-//   sessionStorage.setItem("resumeData", JSON.stringify(formData));
-
-//   // Generate styled PDF from previewRef
-//   const element = previewRef.current;
-//   if (element) {
-//     const canvas = await html2canvas(element, { scale: 2 });
-// const imgData = canvas.toDataURL("image/png");
-
-// // A4 size in pixels at 96 DPI
-// const a4Width = 794;
-// const a4Height = 1123;
-
-// // Scale your content to fit A4 width, maintain aspect ratio
-// const aspectRatio = canvas.height / canvas.width;
-// const pdfHeight = a4Width * aspectRatio;
-
-// const pdf = new jsPDF({
-//   orientation: "portrait",
-//   unit: "px",
-//   format: [a4Width, a4Height],
-// });
-
-// pdf.addImage(imgData, "PNG", 0, 0, a4Width, pdfHeight);
-//     pdf.save(`${formData.fullName || "resume"}.pdf`);
-//   }
-
-//   // Save to backend if logged in
-//   if (!token) {
-//     alert("You are not logged in. Your resume has been downloaded as a PDF.");
-//     return;
-//   }
-
-//   setAiLoading(true);
-//   try {
-//     const response = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//         Authorization: `Bearer ${token}`,
-//       },
-//       body: JSON.stringify({ data: formData }),
-//     });
-
-//     if (!response.ok) {
-//       const errorText = await response.text();
-//       alert(`Failed to save resume: ${errorText || response.statusText}`);
-//       return;
-//     }
-
-//     alert("Resume saved successfully!");
-//     router.push("/dashboard");
-//   } catch (err) {
-//     console.error("Save resume error:", err);
-//     alert("Unexpected error. Try again later.");
-//   } finally {
-//     setAiLoading(false);
-//   }
-// }, [formData, router]);
 
 const handleSubmit = useCallback(async () => {
   const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+
+  if (!token) {
+    // Redirect to login if not logged in
+    router.push("/login?redirect=/resume-builder");
+    return;
+  }
 
   // Save data locally
   localStorage.setItem("resumeData", JSON.stringify(formData));
@@ -198,7 +162,7 @@ const handleSubmit = useCallback(async () => {
       height: canvas.height,
     };
 
-    const pxToMm = (px: number) => px * 0.264583; // px to mm
+    const pxToMm = (px: number) => px * 0.264583;
     const imgWidthMm = pxToMm(imgProps.width);
     const imgHeightMm = pxToMm(imgProps.height);
 
@@ -217,12 +181,6 @@ const handleSubmit = useCallback(async () => {
     pdf.save(`${formData.fullName || "resume"}.pdf`);
   }
 
-  // Save to backend if logged in
-  if (!token) {
-    alert("You are not logged in. Your resume has been downloaded as a PDF.");
-    return;
-  }
-
   setAiLoading(true);
   try {
     const response = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
@@ -231,7 +189,7 @@ const handleSubmit = useCallback(async () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ data: formData }),
+body: JSON.stringify({ id: resumeId, data: formData }),
     });
 
     if (!response.ok) {
@@ -248,7 +206,8 @@ const handleSubmit = useCallback(async () => {
   } finally {
     setAiLoading(false);
   }
-}, [formData, router]);
+}, [formData, router, resumeId]);
+
 
 
   useEffect(() => {
@@ -418,59 +377,7 @@ const getExperienceSuggestions = async (index: number) => {
   }
 };
 
-//  const getExperienceSuggestions = async (index: number) => {
-//   const exp = formData.experience[index];
-//   if (!exp || !exp.description.trim()) return;
 
-//   const rawToken = sessionStorage.getItem('token') || localStorage.getItem('token');
-//   const token = rawToken?.startsWith("Bearer ") ? rawToken.split(" ")[1] : rawToken;
-
-//   console.log("Using token:", token);
-
-//   if (!token) {
-//     alert("You are not logged in.");
-//     return;
-//   }
-
-//   setAiLoading(true);
-
-//   try {
-//     const response = await fetch("https://resume-ai-builder-esnw.onrender.com/ai/suggest", {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//         Authorization: `Bearer ${token}`,
-//       },
-//       body: JSON.stringify({
-//         prompt: `Rewrite and improve this job description using clear, concise bullet points:\n${exp.description}`
-
-//       }),
-//     });
-
-//     if (response.status === 401) {
-//       alert("Unauthorized. Please log in again.");
-//       return;
-//     }
-
-//     if (!response.ok) {
-//       throw new Error(`Request failed with status ${response.status}`);
-//     }
-
-//     const data = await response.json();
-
-//     setAiExpSuggestions((prev) => {
-//       const updated = [...prev];
-//       updated[index] = data.suggestions || [];
-//       return updated;
-//     });
-
-//   } catch (error) {
-//     console.error("Failed to fetch experience suggestions", error);
-//     alert("AI failed to suggest improvements.");
-//   } finally {
-//     setAiLoading(false);
-//   }
-// };
 const getSkillSuggestions = async () => {
   const rawToken = sessionStorage.getItem("token") || localStorage.getItem("token");
   const token = rawToken?.startsWith("Bearer ") ? rawToken.split(" ")[1] : rawToken;
@@ -483,11 +390,16 @@ const getSkillSuggestions = async () => {
   const expText = formData.experience.map((e) => e.description).join("\n");
   const eduText = formData.education.map((e) => `${e.degree} at ${e.school}`).join(", ");
 
-  const prompt = `Based on the following experience and education, suggest a list of at least 9 relevant technical and soft skills:
+  const prompt = `You are an expert resume builder assistant. Based on the following job experience descriptions and education history, extract and infer a diverse list of at least 9 relevant skills. Include both technical skills (like programming languages, tools, frameworks) and soft skills (like communication, leadership, problem solving).
+
+Only return a bullet-pointed list.
+
 Experience:
 ${expText}
+
 Education:
 ${eduText}
+
 Skills:
 -`;
 
@@ -550,14 +462,14 @@ Skills:
 //   const token = rawToken?.startsWith("Bearer ") ? rawToken.split(" ")[1] : rawToken;
 
 //   if (!token) {
-//     alert("You must be logged in to get AI suggestions.");
+//     alert("You must be logged in to get AI skill suggestions.");
 //     return;
 //   }
 
 //   const expText = formData.experience.map((e) => e.description).join("\n");
 //   const eduText = formData.education.map((e) => `${e.degree} at ${e.school}`).join(", ");
 
-//   const prompt = `Based on the following experience and education, suggest a list of at least 9 relevant  technical skills, including both technical skills and soft skills, formatted as bullet points:
+//   const prompt = `Based on the following experience and education, suggest a list of at least 9 relevant technical and soft skills:
 // Experience:
 // ${expText}
 // Education:
@@ -577,28 +489,23 @@ Skills:
 //       body: JSON.stringify({ prompt }),
 //     });
 
-//     if (response.status === 401) {
-//       alert("Unauthorized. Please log in again.");
-//       return;
-//     }
-
 //     if (!response.ok) {
-//       throw new Error(`Request failed with status ${response.status}`);
+//       if (response.status === 401) {
+//         alert("Unauthorized. Please log in again.");
+//         return;
+//       }
+//       throw new Error(`Status ${response.status}`);
 //     }
 
 //     const data = await response.json();
-
-//     // Assume data.suggestions is an array of strings or one string
 //     const rawSkillsText = Array.isArray(data.suggestions) ? data.suggestions.join("\n") : data.suggestions;
 
-//     // Extract bullet points
 //     const bulletPoints = rawSkillsText
-//   .split("\n")
-//   .map((line: string) => line.trim())
-//   .filter((line: string) => line.startsWith("-") || line.startsWith("*"))
-//   .map((line: string) => line.replace(/^[-*]\s*/, ""));
+//       .split("\n")
+//       .map((line: string) => line.trim())
+//       .filter((line: string) => line.startsWith("-") || line.startsWith("*"))
+//       .map((line: string) => line.replace(/^[-*]\s*/, ""));
 
-//     // Common soft skills to pad if needed
 //     const commonSoftSkills = [
 //       "Communication",
 //       "Teamwork",
@@ -626,6 +533,7 @@ Skills:
 
 
 
+
   const onContactChange = useCallback(
     (field: keyof Omit<FormData, "education" | "experience" | "skills">, value: string) => {
       setFormData((old) => ({
@@ -636,158 +544,266 @@ Skills:
     []
   );
 
-  return (
-    <div className="max-w-6xl mx-auto px-6 py-10 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Create Your Resume</h1>
-        <div className="flex gap-4 items-center">
-          <TemplateSelector
-            template={template}
-            setTemplate={(value: string) => setTemplate(value as TemplateType)}
-          />
-        </div>
-      </div>
 
+
+
+  const exportToPDF = async () => {
+  const element = previewRef.current;
+  if (!element) return;
+
+  window.scrollTo(0, 0);
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    scrollY: 0,
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+  const pdf = new jsPDF("p", "mm", "a4");
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = pdf.internal.pageSize.getHeight();
+
+  const pxToMm = (px: number) => px * 0.264583;
+  const imgWidthMm = pxToMm(canvas.width);
+  const imgHeightMm = pxToMm(canvas.height);
+
+  let renderWidth = pdfWidth;
+  let renderHeight = (imgHeightMm * pdfWidth) / imgWidthMm;
+
+  if (renderHeight > pdfHeight) {
+    renderHeight = pdfHeight;
+    renderWidth = (imgWidthMm * pdfHeight) / imgHeightMm;
+  }
+
+  const x = (pdfWidth - renderWidth) / 2;
+  pdf.addImage(imgData, "PNG", x, 0, renderWidth, renderHeight);
+  pdf.save(`${formData.fullName || "resume"}.pdf`);
+};
+
+
+const handleSaveResume = () => {
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+
+  // Save data temporarily before redirecting
+  localStorage.setItem("resumeDataToSave", JSON.stringify(formData));
+
+  if (!token) {
+    router.push("/login?redirect=saveResume");
+    return;
+  }
+
+  saveResumeToBackend(token, formData, resumeId); // <-- pass resumeId here
+};
+
+const saveResumeToBackend = async (
+  token: string,
+  data: FormData,
+  resumeId?: string
+) => {
+  setAiLoading(true);
+  try {
+    const response = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        data,
+        ...(resumeId && { id: resumeId }) // ✅ include id only if present (edit mode)
+      }),
+    });
+
+    if (!response.ok) {
+      alert("Failed to save resume");
+    } else {
+      alert("Resume saved successfully!");
+      router.push("/dashboard");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Unexpected error while saving resume.");
+  } finally {
+    setAiLoading(false);
+  }
+};
+
+
+// const handleSaveResume = () => {
+//   const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+
+//   // Save data temporarily before redirecting
+//   localStorage.setItem("resumeDataToSave", JSON.stringify(formData));
+
+//   if (!token) {
+//     // Redirect to login or register
+//     router.push("/login?redirect=saveResume");
+//     return;
+//   }
+
+//   // Already logged in, save directly
+//   saveResumeToBackend(token, formData);
+// };
+// const saveResumeToBackend = async (token: string, data: FormData) => {
+//   setAiLoading(true);
+//   try {
+//     const response = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Bearer ${token}`,
+//       },
+//       body: JSON.stringify({ data }),
+//     });
+
+//     if (!response.ok) {
+//       alert("Failed to save resume");
+//     } else {
+//       alert("Resume saved successfully!");
+//       router.push("/dashboard");
+//     }
+//   } catch (err) {
+//     console.error(err);
+//     alert("Unexpected error while saving resume.");
+//   } finally {
+//     setAiLoading(false);
+//   }
+// };
+
+return (
+  <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 font-sans">
+    {/* Header and Template Selector */}
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+      <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Create Your Resume</h1>
+      <TemplateSelector
+        template={template}
+        setTemplate={(value: string) => setTemplate(value as TemplateType)}
+      />
+    </div>
+
+    {/* Progress & Navigation */}
+    <div className="space-y-6">
       <ProgressBar step={step} totalSteps={steps.length} />
       <StepNavigation steps={steps} currentStep={step} onStepChange={setStep} />
+    </div>
 
-      <div className="mb-12">
-        {step === 0 && (
-          <ContactStep
-            formData={formData}
-            onChange={onContactChange}
-            onSummaryChange={onSummaryChange}
-            summary={formData.summary}
-            getSummarySuggestions={getSummarySuggestions}
-            aiSummarySuggestions={aiSummarySuggestions}
-            applySummarySuggestion={(sugg) => setFormData((old) => ({ ...old, summary: sugg }))}
-            aiLoading={aiLoading}
-            isDeveloper={formData.isDeveloper}
-            onDeveloperToggle={onDeveloperToggle}
-          />
-        )}
+    {/* Form Steps */}
+    <div className="my-10 space-y-10">
+      {step === 0 && (
+        <ContactStep
+          formData={formData}
+          onChange={onContactChange}
+          onSummaryChange={onSummaryChange}
+          summary={formData.summary}
+          getSummarySuggestions={getSummarySuggestions}
+          aiSummarySuggestions={aiSummarySuggestions}
+          applySummarySuggestion={(sugg) => setFormData((old) => ({ ...old, summary: sugg }))}
+          aiLoading={aiLoading}
+          isDeveloper={formData.isDeveloper}
+          onDeveloperToggle={onDeveloperToggle}
+        />
+      )}
 
-        {step === 1 && (
-          <EducationStep
-            education={formData.education}
-            addItem={() => addItem("education")}
-            removeItem={(index) => removeItem("education", index)}
-            onChange={(index, field, value) => onChange("education", index, field, value)}
-          />
-        )}
+      {step === 1 && (
+        <EducationStep
+          education={formData.education}
+          addItem={() => addItem("education")}
+          removeItem={(index) => removeItem("education", index)}
+          onChange={(index, field, value) => onChange("education", index, field, value)}
+        />
+      )}
 
-        {step === 2 && (
-          <ExperienceStep
-            experience={formData.experience}
-            addItem={() => addItem("experience")}
-            removeItem={(index) => removeItem("experience", index)}
-            onChange={(index, key, value) => onChange("experience", index, key, value)}
-            getExperienceSuggestions={getExperienceSuggestions}
-            aiExpSuggestions={aiExpSuggestions}
-            applyExperienceSuggestion={(index, sugg) => {
-              setFormData((old) => {
-                const updated = [...old.experience];
-                updated[index].description = sugg;
-                return { ...old, experience: updated };
-              });
-              setAiExpSuggestions((old) => {
-                const updated = [...old];
-                updated[index] = [];
-                return updated;
-              });
-            }}
-            aiLoading={aiLoading}
-          />
-        )}
+      {step === 2 && (
+        <ExperienceStep
+          experience={formData.experience}
+          addItem={() => addItem("experience")}
+          removeItem={(index) => removeItem("experience", index)}
+          onChange={(index, key, value) => onChange("experience", index, key, value)}
+          getExperienceSuggestions={getExperienceSuggestions}
+          aiExpSuggestions={aiExpSuggestions}
+          applyExperienceSuggestion={(index, sugg) => {
+            setFormData((old) => {
+              const updated = [...old.experience];
+              updated[index].description = sugg;
+              return { ...old, experience: updated };
+            });
+            setAiExpSuggestions((old) => {
+              const updated = [...old];
+              updated[index] = [];
+              return updated;
+            });
+          }}
+          aiLoading={aiLoading}
+        />
+      )}
 
-        {step === 3 && (
-          <SkillsStep
-            skills={formData.skills}
-            addItem={() => addItem("skills")}
-            removeItem={(index) => removeItem("skills", index)}
-            onChange={(index, value) => {
-              setFormData((old) => {
-                const updatedSkills = [...old.skills];
-                updatedSkills[index] = value;
-                return { ...old, skills: updatedSkills };
-              });
-            }}
-            getSkillSuggestions={getSkillSuggestions}
-            aiSkillSuggestions={aiSkillSuggestions}
-            aiLoading={aiLoading}
-          />
-        )}
-      </div>
+      {step === 3 && (
+        <SkillsStep
+          skills={formData.skills}
+          addItem={() => addItem("skills")}
+          removeItem={(index) => removeItem("skills", index)}
+          onChange={(index, value) => {
+            setFormData((old) => {
+              const updatedSkills = [...old.skills];
+              updatedSkills[index] = value;
+              return { ...old, skills: updatedSkills };
+            });
+          }}
+          getSkillSuggestions={getSkillSuggestions}
+          aiSkillSuggestions={aiSkillSuggestions}
+          aiLoading={aiLoading}
+        />
+      )}
+    </div>
 
-      <div className="flex justify-between mt-4">
+    {/* Navigation Buttons */}
+    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8">
+      <button
+        onClick={() => setStep((s) => Math.max(0, s - 1))}
+        disabled={step === 0}
+        className="w-full sm:w-auto px-5 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition disabled:opacity-50"
+      >
+        Previous
+      </button>
+
+      {step < steps.length - 1 ? (
         <button
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-          disabled={step === 0}
-          className="px-5 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition disabled:opacity-50"
+          onClick={() => setStep((s) => Math.min(steps.length - 1, s + 1))}
+          className="w-full sm:w-auto px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
         >
-          Previous
+          Next
         </button>
-        {step < steps.length - 1 ? (
+      ) : (
+        <div className="flex flex-col sm:flex-row justify-end gap-4 w-full sm:w-auto">
           <button
-            onClick={() => setStep((s) => Math.min(steps.length - 1, s + 1))}
-            className="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+            onClick={exportToPDF}
+            className="w-full sm:w-auto px-5 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
           >
-            Next
+            Export PDF
           </button>
-        ) : (
-          // <button
-          //   onClick={handleSubmit}
-          //   className="px-5 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
-          // >
-          //   Save Resume
-          // </button>
+
           <button
-  onClick={handleSubmit}
-  className="px-5 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-50"
-  disabled={aiLoading}
->
-  {aiLoading ? "Processing..." : "Save / Export Resume"}
-</button>
+            onClick={handleSaveResume}
+            className="w-full sm:w-auto px-5 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-50"
+            disabled={aiLoading}
+          >
+            {aiLoading ? "Saving..." : "Save Resume"}
+          </button>
+        </div>
+      )}
+    </div>
 
-        )}
-      </div>
-
-      {/* <div className="mt-14 space-y-12">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Preview</h2>
-        <ResumePreview data={formData} template={template} />
-      </div> */}
-     {/* <div
-  id="resume-preview"
-  style={{
-    backgroundColor: "#fff",
-    color: "#000",
-  }}
-  ref={previewRef}
->
-  <ResumePreview data={formData} template={template} />
-</div> */}
-<div
+    {/* Resume Preview */}
+   <div
   id="resume-preview"
   ref={previewRef}
-  style={{
-    width: "210mm",             // Standard A4 width
-    minHeight: "297mm",         // Standard A4 height
-    backgroundColor: "#fff",
-    color: "#000",
-    padding: "0",               // No padding
-    margin: "0",                // No margin
-    boxSizing: "border-box",
-    overflow: "hidden",         // Hide overflow during screenshot
-    transform: "scale(1)",      // Avoid distortion
-    transformOrigin: "top left",
-  }}
+  className="mt-10 bg-white text-black shadow border rounded overflow-hidden w-full max-w-[850px] mx-auto p-4 sm:p-6 lg:p-8 print:w-[210mm] print:min-h-[297mm] print:p-0 print:shadow-none print:border-none"
 >
   <ResumePreview data={formData} template={template} />
 </div>
 
 
-
-
-    </div>
-  );
+  </div>
+);
 }

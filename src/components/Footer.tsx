@@ -52,15 +52,7 @@ export default function Footer() {
               </Link>
             </li>
            
-            {/* <li><Link href="/contact" className="hover:text-blue-600">Contact</Link></li> */}
-            <li>
-              <Link
-                href="/dashboard"
-                className="text-gray-600 hover:text-blue-600 transition-colors duration-200 ease-in-out font-medium"
-              >
-                Dashboard
-              </Link>
-            </li>
+         
           </ul>
         </div>
       </div>
