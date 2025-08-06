@@ -1,105 +1,5 @@
-// import React from "react";
-
-// // Match ResumePreview types
-// interface ExperienceItem {
-//   role: string;
-//   company: string;
-//   from: string;
-//   to: string;
-//   description: string;
-// }
-
-// interface EducationItem {
-//   degree: string;
-//   school: string;
-//   from: string;
-//   to: string;
-// }
-
-// interface ModernTemplateProps {
-//   data: {
-//     fullName: string;
-//     email: string;
-//     phone: string;
-//     summary?: string;
-//     experience?: ExperienceItem[];
-//     education?: EducationItem[];
-//     skills?: string[];
-//   };
-// }
-
-// const ModernTemplate: React.FC<ModernTemplateProps> = ({ data }) => {
-//   const { fullName, email, phone, summary, experience, education, skills } = data;
-
-//   return (
-//     <div className="bg-white p-10 max-w-3xl mx-auto text-gray-900 font-sans shadow-md rounded">
-//       <header className="border-b pb-4 mb-6">
-//         <h1 className="text-3xl font-bold">{fullName}</h1>
-//         <p className="text-sm text-gray-600">
-//           {email} | {phone}
-//         </p>
-//       </header>
-
-//       {summary && (
-//         <section className="mb-6">
-//           <h2 className="text-xl font-semibold mb-1">Summary</h2>
-//           <p className="text-gray-700">{summary}</p>
-//         </section>
-//       )}
-
-//       {experience && experience.length > 0 && (
-//         <section className="mb-6">
-//           <h2 className="text-xl font-semibold mb-1">Experience</h2>
-//           {experience.map((item, index) => (
-//             <div key={index} className="mb-3">
-//               <p className="font-bold">
-//                 {item.role} - <span className="font-normal">{item.company}</span>
-//               </p>
-//               <p className="text-sm text-gray-500">
-//                 {item.from} – {item.to}
-//               </p>
-//               <p className="text-gray-700">{item.description}</p>
-//             </div>
-//           ))}
-//         </section>
-//       )}
-
-//       {education && education.length > 0 && (
-//         <section className="mb-6">
-//           <h2 className="text-xl font-semibold mb-1">Education</h2>
-//           {education.map((item, index) => (
-//             <div key={index} className="mb-3">
-//               <p className="font-bold">
-//                 {item.degree} - <span className="font-normal">{item.school}</span>
-//               </p>
-//               <p className="text-sm text-gray-500">
-//                 {item.from} – {item.to}
-//               </p>
-//             </div>
-//           ))}
-//         </section>
-//       )}
-
-//       {skills && skills.length > 0 && (
-//         <section>
-//           <h2 className="text-xl font-semibold mb-1">Skills</h2>
-//           <ul className="flex flex-wrap gap-2 mt-2">
-//             {skills.map((skill, index) => (
-//               <li key={index} className="bg-gray-200 text-sm px-3 py-1 rounded-full">
-//                 {skill}
-//               </li>
-//             ))}
-//           </ul>
-//         </section>
-//       )}
-//     </div>
-//   );
-// };
-
-// export default ModernTemplate;
 import React from "react";
 
-// Match ResumePreview types
 interface ExperienceItem {
   role?: string;
   company?: string;
@@ -131,69 +31,83 @@ const ModernTemplate: React.FC<ModernTemplateProps> = ({ data }) => {
   const { fullName, email, phone, summary, experience, education, skills } = data;
 
   return (
-    <div className="bg-white p-6 sm:p-10 max-w-4xl mx-auto text-gray-900 font-sans shadow-md rounded-lg print:shadow-none print:border-none">
-      {/* Header */}
-      <header className="border-b pb-4 mb-6">
-        <h1 className="text-3xl sm:text-4xl font-bold">{fullName || "Your Name"}</h1>
-        <p className="text-sm text-gray-600 mt-1">
+    <div
+      style={{
+        backgroundColor: "#fff",
+        padding: "2rem",
+        maxWidth: "900px",
+        margin: "0 auto",
+        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        color: "#111827",
+        borderRadius: "12px",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+      }}
+    >
+      <header style={{ borderBottom: "2px solid #1f2937", paddingBottom: "1rem", marginBottom: "2rem" }}>
+        <h1 style={{ fontSize: "2.5rem", fontWeight: "bold", letterSpacing: "-0.5px" }}>{fullName || "Your Name"}</h1>
+        <p style={{ fontSize: "0.95rem", color: "#4B5563", marginTop: "0.25rem" }}>
           {email || "your@email.com"} | {phone || "Phone Number"}
         </p>
       </header>
 
-      {/* Summary */}
       {summary && (
-        <section className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">Summary</h2>
-          <p className="text-gray-700 text-sm whitespace-pre-line">{summary}</p>
+        <section style={{ marginBottom: "2rem" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, borderBottom: "1px solid #d1d5db", paddingBottom: "0.5rem" }}>Summary</h2>
+          <p style={{ fontSize: "0.95rem", color: "#374151", marginTop: "0.75rem", lineHeight: 1.6, whiteSpace: "pre-line" }}>{summary}</p>
         </section>
       )}
 
-      {/* Experience */}
       {experience && experience.length > 0 && (
-        <section className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">Experience</h2>
+        <section style={{ marginBottom: "2rem" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, borderBottom: "1px solid #d1d5db", paddingBottom: "0.5rem" }}>Experience</h2>
           {experience.map((item, index) => (
-            <div key={index} className="mb-4">
-              <p className="font-semibold">
-                {item.role || "Role"} - <span className="font-normal">{item.company || "Company"}</span>
-              </p>
-              <p className="text-sm text-gray-500">
-                {item.from || "Start"} – {item.to || "End"}
-              </p>
+            <div key={index} style={{ marginTop: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <h3 style={{ fontSize: "1rem", fontWeight: 600 }}>{item.role || "Role"} <span style={{ fontWeight: 400 }}>@ {item.company || "Company"}</span></h3>
+                <span style={{ fontSize: "0.85rem", fontStyle: "italic", color: "#6B7280" }}>{item.from || "Start"} – {item.to || "End"}</span>
+              </div>
               {item.description && (
-                <p className="text-sm text-gray-700 mt-1 whitespace-pre-line">
-                  {item.description}
-                </p>
+                <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem", listStyle: "disc" }}>
+                  {item.description.split("\n").map((point, i) => (
+                    <li key={i} style={{ fontSize: "0.95rem", marginBottom: "0.25rem" }}>{point.trim()}</li>
+                  ))}
+                </ul>
               )}
             </div>
           ))}
         </section>
       )}
 
-      {/* Education */}
       {education && education.length > 0 && (
-        <section className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">Education</h2>
+        <section style={{ marginBottom: "2rem" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, borderBottom: "1px solid #d1d5db", paddingBottom: "0.5rem" }}>Education</h2>
           {education.map((item, index) => (
-            <div key={index} className="mb-3">
-              <p className="font-semibold">
-                {item.degree || "Degree"} - <span className="font-normal">{item.school || "School"}</span>
-              </p>
-              <p className="text-sm text-gray-500">
-                {item.from || "Start"} – {item.to || "End"}
-              </p>
+            <div key={index} style={{ marginTop: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <h3 style={{ fontSize: "1rem", fontWeight: 600 }}>{item.degree || "Degree"} <span style={{ fontWeight: 400 }}>@ {item.school || "School"}</span></h3>
+                <span style={{ fontSize: "0.85rem", fontStyle: "italic", color: "#6B7280" }}>{item.from || "Start"} – {item.to || "End"}</span>
+              </div>
             </div>
           ))}
         </section>
       )}
 
-      {/* Skills */}
       {skills && skills.length > 0 && (
         <section>
-          <h2 className="text-xl font-semibold mb-2">Skills</h2>
-          <ul className="flex flex-wrap gap-2 mt-2">
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, borderBottom: "1px solid #d1d5db", paddingBottom: "0.5rem" }}>Skills</h2>
+          <ul style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.75rem" }}>
             {skills.map((skill, index) => (
-              <li key={index} className="bg-gray-200 text-sm px-3 py-1 rounded-full">
+              <li
+                key={index}
+                style={{
+                  backgroundColor: "#E5E7EB",
+                  padding: "0.4rem 0.8rem",
+                  borderRadius: "9999px",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  color: "#111827",
+                }}
+              >
                 {skill}
               </li>
             ))}
