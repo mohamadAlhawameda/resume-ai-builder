@@ -30,51 +30,94 @@ export default function LoginPage() {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = async (data: FormData) => {
-    setLoading(true);
-    setError(null);
+const onSubmit = async (data: FormData) => {
+  setLoading(true);
+  setError(null);
 
-    try {
-      const response = await fetch("https://resume-ai-builder-esnw.onrender.com/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-        }),
-      });
+  try {
+    const response = await fetch("https://resume-ai-builder-esnw.onrender.com/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: data.email,
+        password: data.password,
+      }),
+    });
 
-      const result = await response.json();
+    const result = await response.json();
 
-      if (!response.ok) {
-        setError(result?.message || "Login failed. Please check your credentials.");
-        return;
-      }
-
-      const token = result?.token;
-      const user = result?.user;
-
-      if (!token || !user) {
-        setError("Invalid response from server. Please try again later.");
-        return;
-      }
-
-      if (data.rememberMe) {
-        localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify(user));
-      } else {
-        sessionStorage.setItem("token", token);
-        sessionStorage.setItem("user", JSON.stringify(user));
-      }
-
-      router.push("/resume");
-    } catch (err) {
-      console.error("Login error:", err);
-      setError("Unexpected server error. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      setError(result?.message || "Login failed. Please check your credentials.");
+      return;
     }
-  };
+
+    const token = result?.token;
+    const user = result?.user;
+
+    if (!token || !user) {
+      setError("Invalid response from server. Please try again later.");
+      return;
+    }
+
+  if (data.rememberMe) {
+  localStorage.setItem("token", token);
+  localStorage.setItem("user", JSON.stringify(user));
+} else {
+  sessionStorage.setItem("token", token);
+  sessionStorage.setItem("user", JSON.stringify(user));
+}
+
+// ✅ Trigger navbar update
+window.dispatchEvent(new Event("authChanged"));
+
+
+    // Check if redirected for saving a resume
+    const redirectUrl = new URL(window.location.href);
+    const redirectAction = redirectUrl.searchParams.get("redirect");
+
+    if (redirectAction === "saveResume") {
+      const resumeDataToSave = localStorage.getItem("resumeDataToSave");
+
+      if (resumeDataToSave) {
+        const parsedData = JSON.parse(resumeDataToSave);
+        try {
+          const saveResponse = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ data: parsedData }),
+          });
+
+          if (!saveResponse.ok) {
+            const errorText = await saveResponse.text();
+            console.error("Failed to auto-save resume after login:", errorText);
+            alert("Logged in successfully, but auto-saving resume failed.");
+          } else {
+            alert("Logged in and resume saved successfully!");
+          }
+
+          localStorage.removeItem("resumeDataToSave");
+        } catch (saveErr) {
+          console.error("Resume save error after login:", saveErr);
+        }
+      }
+
+      router.push("/dashboard");
+      return;
+    }
+
+    // Normal login
+    router.push("/dashboard");
+  } catch (err) {
+    console.error("Login error:", err);
+    setError("Unexpected server error. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-r from-purple-200 via-indigo-200 to-blue-200 px-4">

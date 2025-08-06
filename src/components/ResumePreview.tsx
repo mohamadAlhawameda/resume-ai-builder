@@ -42,13 +42,19 @@ export default function ResumePreview({ data, template }: ResumePreviewProps) {
       case "minimal":
         return <MinimalTemplate data={data} />;
       default:
-        return <ModernTemplate data={data} />;
+        return (
+          <div className="text-center py-8 text-red-500 font-medium">
+            Unknown template: {template}
+          </div>
+        );
     }
   };
 
   return (
-    <div className="border rounded-lg shadow overflow-hidden bg-white p-6 print:p-0 print:shadow-none print:border-none">
-      {renderTemplate()}
+    <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 print:px-0">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden mx-auto max-w-[900px] w-full p-4 sm:p-6 md:p-8 print:shadow-none print:border-none print:p-0">
+        {renderTemplate()}
+      </div>
     </div>
   );
 }

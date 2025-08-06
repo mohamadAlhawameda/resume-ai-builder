@@ -2,15 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import useAuthStatus from '@/app/hooks/useAuthStatus';
 
 export default function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const isAuthenticated = useAuthStatus();
 
-  // Explicitly type href as string
+  useEffect(() => {
+    // Ensure this only runs client-side
+    setIsClient(true);
+  }, []);
+
   const isActive = (href: string) => pathname === href;
 
   return (
@@ -26,22 +33,35 @@ export default function Navbar() {
 
         {/* Desktop Links */}
         <nav className="hidden md:flex items-center space-x-4">
-          <Link
-            href="/login"
-            className={`text-sm font-medium px-4 py-2 rounded transition ${
-              isActive('/login')
-                ? 'text-blue-600 font-semibold'
-                : 'text-gray-700 hover:text-blue-600'
-            }`}
-          >
-            Login
-          </Link>
-          <Link
-            href="/register"
-            className="text-sm px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-          >
-            Get Started
-          </Link>
+          {isClient && isAuthenticated ? (
+            <Link
+              href="/dashboard"
+              className={`text-sm px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition ${
+                isActive('/dashboard') ? 'ring-2 ring-green-400' : ''
+              }`}
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className={`text-sm font-medium px-4 py-2 rounded transition ${
+                  isActive('/login')
+                    ? 'text-blue-600 font-semibold'
+                    : 'text-gray-700 hover:text-blue-600'
+                }`}
+              >
+                Login
+              </Link>
+              <Link
+                href="/register"
+                className="text-sm px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+              >
+                Get Started
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Mobile Hamburger */}
@@ -64,24 +84,38 @@ export default function Navbar() {
             transition={{ duration: 0.3 }}
             className="md:hidden px-6 pb-4 space-y-3 bg-white shadow-sm border-t"
           >
-            <Link
-              href="/login"
-              onClick={() => setIsOpen(false)}
-              className={`block text-sm font-medium transition ${
-                isActive('/login')
-                  ? 'text-blue-600 font-semibold'
-                  : 'text-gray-700 hover:text-blue-600'
-              }`}
-            >
-              Login
-            </Link>
-            <Link
-              href="/register"
-              onClick={() => setIsOpen(false)}
-              className="block w-full text-center text-sm px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-            >
-              Get Started
-            </Link>
+            {isClient && isAuthenticated ? (
+              <Link
+                href="/dashboard"
+                onClick={() => setIsOpen(false)}
+                className={`block w-full text-center text-sm px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition ${
+                  isActive('/dashboard') ? 'ring-2 ring-green-400' : ''
+                }`}
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={() => setIsOpen(false)}
+                  className={`block text-sm font-medium transition ${
+                    isActive('/login')
+                      ? 'text-blue-600 font-semibold'
+                      : 'text-gray-700 hover:text-blue-600'
+                  }`}
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={() => setIsOpen(false)}
+                  className="block w-full text-center text-sm px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </motion.nav>
         )}
       </AnimatePresence>

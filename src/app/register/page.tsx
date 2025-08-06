@@ -49,28 +49,81 @@ export default function AdvancedRegisterPage() {
     setPasswordStrength('Medium');
   }, [watchedPassword]);
 
-  const onSubmit = async (data: FormData) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('https://resume-ai-builder-esnw.onrender.com/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),
-      });
+ const onSubmit = async (data: FormData) => {
+  setLoading(true);
+  setError(null);
 
-      if (!res.ok) {
-        const json = await res.json();
-        setError(json.message || 'Registration failed');
-        return;
-      }
-      router.push('/login');
-    } catch {
-      setError('Unexpected server error, please try again.');
-    } finally {
-      setLoading(false);
+  try {
+    const res = await fetch('https://resume-ai-builder-esnw.onrender.com/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      setError(result.message || 'Registration failed');
+      return;
     }
-  };
+
+    const { token, user } = result;
+
+    if (!token || !user) {
+      setError("Invalid response from server. Please try again.");
+      return;
+    }
+
+    // Store auth
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+
+    // Check if redirected for resume saving
+    const redirectUrl = new URL(window.location.href);
+    const redirectAction = redirectUrl.searchParams.get("redirect");
+
+    if (redirectAction === "saveResume") {
+      const resumeDataToSave = localStorage.getItem("resumeDataToSave");
+
+      if (resumeDataToSave) {
+        try {
+          const saveResponse = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ data: JSON.parse(resumeDataToSave) }),
+          });
+
+          if (!saveResponse.ok) {
+            console.error("Auto-save resume failed:", await saveResponse.text());
+            alert("Account created but auto-saving resume failed.");
+          } else {
+            alert("Account created and resume saved!");
+          }
+
+          localStorage.removeItem("resumeDataToSave");
+        } catch (err) {
+          console.error("Resume auto-save error:", err);
+        }
+      }
+
+      router.push("/dashboard");
+      return;
+    }
+
+    // Normal flow if not resume save
+    router.push("/resume");
+
+  } catch (err) {
+    console.error("Registration error:", err);
+    setError("Unexpected server error, please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-r from-indigo-100 via-sky-100 to-emerald-100 px-4">
