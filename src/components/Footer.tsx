@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Mail, Github, Linkedin, FileText } from 'lucide-react';
-import { APP_NAME } from '@/lib/config';
+import { APP_NAME, APP_NAME_PRIMARY, APP_NAME_ACCENT } from '@/lib/config';
 
 const PRODUCT_LINKS = [
   { href: '/resume', label: 'Resume Builder' },
@@ -27,8 +27,8 @@ export default function Footer() {
             <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
               <FileText className="w-4 h-4" aria-hidden />
             </span>
-            {APP_NAME.slice(0, 6)}
-            <span className="text-blue-600 -ml-2">{APP_NAME.slice(6)}</span>
+            {APP_NAME_PRIMARY}
+            {APP_NAME_ACCENT && <span className="text-blue-600">{APP_NAME_ACCENT}</span>}
           </Link>
           <p className="text-slate-500 leading-relaxed max-w-md">
             Build standout resumes, scan them against ATS criteria, and discover jobs that

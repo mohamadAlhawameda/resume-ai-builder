@@ -1,4 +1,4 @@
-# ResumeAI — AI Resume Builder, Scanner & Job Matching
+# Rolevant AI — AI Resume Builder, Scanner & Job Matching
 
 A full-stack AI career platform: build professional resumes with live preview,
 scan them against ATS-style criteria (score out of 100 across 9 categories),

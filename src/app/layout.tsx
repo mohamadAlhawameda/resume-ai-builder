@@ -19,8 +19,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "ResumeAI — AI Resume Builder, Scanner & Job Matching",
-    template: "%s · ResumeAI",
+    default: "Rolevant AI — AI Resume Builder, Scanner & Job Matching",
+    template: "%s · Rolevant AI",
   },
   description:
     "Build professional resumes, scan them against ATS criteria, match them to job descriptions, and discover jobs that fit — all powered by AI.",

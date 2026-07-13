@@ -21,7 +21,7 @@ import clsx from 'clsx';
 import useAuthStatus from '@/app/hooks/useAuthStatus';
 import { getUser, clearSession } from '@/lib/auth';
 import { api } from '@/lib/api';
-import { APP_NAME } from '@/lib/config';
+import { APP_NAME_PRIMARY, APP_NAME_ACCENT } from '@/lib/config';
 import type { AppNotification } from '@/lib/types';
 
 const NAV_LINKS = [
@@ -110,8 +110,8 @@ export default function Navbar() {
             <FileText className="w-4.5 h-4.5" aria-hidden />
           </span>
           <span>
-            {APP_NAME.slice(0, 6)}
-            <span className="text-blue-600">{APP_NAME.slice(6)}</span>
+            {APP_NAME_PRIMARY}
+            {APP_NAME_ACCENT && <span className="text-blue-600"> {APP_NAME_ACCENT}</span>}
           </span>
         </Link>
 

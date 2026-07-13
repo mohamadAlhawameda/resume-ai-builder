@@ -12,7 +12,7 @@ const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT, 10) || 587;
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
-const FROM = process.env.EMAIL_FROM || (SMTP_USER ? `ResumeAI <${SMTP_USER}>` : '');
+const FROM = process.env.EMAIL_FROM || (SMTP_USER ? `Rolevant AI <${SMTP_USER}>` : '');
 
 export const emailEnabled = () => !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
 
@@ -48,10 +48,10 @@ const APP_URL = process.env.APP_URL || 'https://your-app-url';
 export async function sendWelcomeEmail(user) {
   return sendEmail({
     to: user.email,
-    subject: 'Welcome to ResumeAI 🎉',
+    subject: 'Welcome to Rolevant AI 🎉',
     text: `Hi ${user.name},
 
-Welcome to ResumeAI! Here's how to get the most out of it:
+Welcome to Rolevant AI! Here's how to get the most out of it:
 
 1. Upload your existing resume (PDF or DOCX) — we'll parse and score it instantly.
 2. Review your score and apply the top fixes.
@@ -61,7 +61,7 @@ Welcome to ResumeAI! Here's how to get the most out of it:
 
 Get started: ${APP_URL}/analyze
 
-— The ResumeAI team`,
+— The Rolevant AI team`,
   });
 }
 
@@ -80,7 +80,7 @@ Prep for it (match report, cover letter, interview questions): ${APP_URL}/jobs?t
 
 You're receiving this because email alerts are enabled in your job preferences (${APP_URL}/jobs?tab=preferences).
 
-— ResumeAI`,
+— Rolevant AI`,
   });
 }
 
@@ -113,6 +113,6 @@ Get ready:
   return sendEmail({
     to: user.email,
     subject: msg.subject,
-    text: `Hi ${user.name},\n\n${msg.body}\n\n— ResumeAI`,
+    text: `Hi ${user.name},\n\n${msg.body}\n\n— Rolevant AI`,
   });
 }

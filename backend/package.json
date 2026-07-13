@@ -12,7 +12,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "Backend API for Resume AI Builder project, including user authentication, OpenAI integration, and email notifications.",
+  "description": "Backend API for the Rolevant AI project, including user authentication, OpenAI integration, and email notifications.",
   "engines": {
     "node": ">=18"
   },
