@@ -12,6 +12,8 @@ import {
   AlignmentType,
   TabStopType,
   BorderStyle,
+  type IParagraphOptions,
+  type IRunOptions,
 } from 'docx';
 import type { ResumeData, SectionKey } from './types';
 import { DEFAULT_SECTION_ORDER, SECTION_LABELS } from './types';
@@ -81,12 +83,23 @@ export async function exportToDocx(data: ResumeData, filename: string) {
     data.sectionOrder && data.sectionOrder.length > 0 ? data.sectionOrder : DEFAULT_SECTION_ORDER;
   const hidden = new Set(data.hiddenSections || []);
 
+  // Arabic resumes need right-to-left paragraph/run direction (w:bidi / w:rtl)
+  // for Word to lay out and align the text correctly.
+  const isRtl = data.language === 'ar';
+  const mkPara = (opts: IParagraphOptions) =>
+    new Paragraph({
+      ...opts,
+      bidirectional: isRtl,
+      alignment: isRtl ? AlignmentType.RIGHT : opts.alignment,
+    });
+  const mkRun = (opts: IRunOptions) => new TextRun({ ...opts, rightToLeft: isRtl });
+
   const children: Paragraph[] = [];
 
   // Header
   children.push(
-    new Paragraph({
-      children: [new TextRun({ text: data.fullName || 'Your Name', bold: true, size: 56 })],
+    mkPara({
+      children: [mkRun({ text: data.fullName || 'Your Name', bold: true, size: 56 })],
       spacing: { after: 60 },
     })
   );
@@ -98,17 +111,17 @@ export async function exportToDocx(data: ResumeData, filename: string) {
     data.isDeveloper ? data.github : '',
   ].filter(Boolean);
   children.push(
-    new Paragraph({
-      children: [new TextRun({ text: contactBits.join('  |  '), size: 19, color: '555555' })],
+    mkPara({
+      children: [mkRun({ text: contactBits.join('  |  '), size: 19, color: '555555' })],
       spacing: { after: 240 },
       border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: accent, space: 6 } },
     })
   );
 
   const sectionHeading = (label: string) =>
-    new Paragraph({
+    mkPara({
       heading: HeadingLevel.HEADING_2,
-      children: [new TextRun({ text: label.toUpperCase(), bold: true, size: 24, color: accent })],
+      children: [mkRun({ text: label.toUpperCase(), bold: true, size: 24, color: accent })],
       spacing: { before: 240, after: 120 },
     });
 
@@ -117,8 +130,8 @@ export async function exportToDocx(data: ResumeData, filename: string) {
       if (!data.summary?.trim()) return;
       children.push(sectionHeading(SECTION_LABELS.summary));
       children.push(
-        new Paragraph({
-          children: [new TextRun({ text: data.summary, size: 21 })],
+        mkPara({
+          children: [mkRun({ text: data.summary, size: 21 })],
           spacing: { after: 120 },
         })
       );
@@ -128,19 +141,19 @@ export async function exportToDocx(data: ResumeData, filename: string) {
       children.push(sectionHeading(SECTION_LABELS.experience));
       for (const exp of data.experience) {
         children.push(
-          new Paragraph({
+          mkPara({
             tabStops: [{ type: TabStopType.RIGHT, position: 9600 }],
             children: [
-              new TextRun({ text: `${exp.role || 'Role'}, ${exp.company || 'Company'}`, bold: true, size: 22 }),
-              new TextRun({ text: `\t${exp.from || ''} – ${exp.to || ''}`, italics: true, size: 19, color: '666666' }),
+              mkRun({ text: `${exp.role || 'Role'}, ${exp.company || 'Company'}`, bold: true, size: 22 }),
+              mkRun({ text: `\t${exp.from || ''} – ${exp.to || ''}`, italics: true, size: 19, color: '666666' }),
             ],
             spacing: { before: 120, after: 60 },
           })
         );
         for (const b of bulletsOf(exp.description)) {
           children.push(
-            new Paragraph({
-              children: [new TextRun({ text: b, size: 21 })],
+            mkPara({
+              children: [mkRun({ text: b, size: 21 })],
               bullet: { level: 0 },
               spacing: { after: 40 },
             })
@@ -153,19 +166,19 @@ export async function exportToDocx(data: ResumeData, filename: string) {
       children.push(sectionHeading(SECTION_LABELS.education));
       for (const edu of data.education) {
         children.push(
-          new Paragraph({
+          mkPara({
             tabStops: [{ type: TabStopType.RIGHT, position: 9600 }],
             children: [
-              new TextRun({ text: `${edu.degree || 'Degree'}, ${edu.school || 'School'}`, bold: true, size: 22 }),
-              new TextRun({ text: `\t${edu.from || ''} – ${edu.to || ''}`, italics: true, size: 19, color: '666666' }),
+              mkRun({ text: `${edu.degree || 'Degree'}, ${edu.school || 'School'}`, bold: true, size: 22 }),
+              mkRun({ text: `\t${edu.from || ''} – ${edu.to || ''}`, italics: true, size: 19, color: '666666' }),
             ],
             spacing: { before: 100, after: 40 },
           })
         );
         for (const b of bulletsOf(edu.achievements)) {
           children.push(
-            new Paragraph({
-              children: [new TextRun({ text: b, size: 21 })],
+            mkPara({
+              children: [mkRun({ text: b, size: 21 })],
               bullet: { level: 0 },
               spacing: { after: 40 },
             })
@@ -178,8 +191,8 @@ export async function exportToDocx(data: ResumeData, filename: string) {
       if (skills.length === 0) return;
       children.push(sectionHeading(SECTION_LABELS.skills));
       children.push(
-        new Paragraph({
-          children: [new TextRun({ text: skills.join('  ·  '), size: 21 })],
+        mkPara({
+          children: [mkRun({ text: skills.join('  ·  '), size: 21 })],
           alignment: AlignmentType.LEFT,
           spacing: { after: 120 },
         })
@@ -193,7 +206,7 @@ export async function exportToDocx(data: ResumeData, filename: string) {
 
   const doc = new Document({
     styles: {
-      default: { document: { run: { font: 'Calibri' } } },
+      default: { document: { run: { font: isRtl ? 'Arial' : 'Calibri' } } },
     },
     sections: [
       {

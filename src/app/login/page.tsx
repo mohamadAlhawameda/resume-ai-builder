@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,22 +12,27 @@ import Button from '@/components/ui/Button';
 import GoogleSignInButton, { type GoogleAuthResult } from '@/components/GoogleSignInButton';
 import { api, apiErrorMessage } from '@/lib/api';
 import { storeSession, type StoredUser } from '@/lib/auth';
+import { useLocale } from '@/i18n/LocaleProvider';
 
-const schema = z.object({
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(1, 'Password is required'),
-  rememberMe: z.boolean().optional(),
-});
+type FormData = z.infer<ReturnType<typeof makeSchema>>;
 
-type FormData = z.infer<typeof schema>;
+function makeSchema(t: (key: string) => string) {
+  return z.object({
+    email: z.string().email(t('auth.emailInvalid')),
+    password: z.string().min(1, t('auth.passwordRequired')),
+    rememberMe: z.boolean().optional(),
+  });
+}
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const schema = useMemo(() => makeSchema(t), [t]);
   const {
     register,
     handleSubmit,
@@ -101,8 +106,8 @@ function LoginContent() {
   return (
     <main className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-12">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl" />
+        <div className="absolute -top-24 -start-24 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -end-24 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl" />
       </div>
       <motion.form
         initial={{ opacity: 0, y: 16 }}
@@ -112,12 +117,12 @@ function LoginContent() {
         className="relative w-full max-w-md bg-white/95 backdrop-blur-sm shadow-[0_30px_80px_-20px_rgba(37,99,235,0.25)] ring-1 ring-slate-900/5 p-8 sm:p-10 rounded-3xl border border-slate-100"
         noValidate
       >
-        <h1 className="text-2xl sm:text-3xl font-bold text-center mb-2 text-slate-900">Welcome back</h1>
-        <p className="text-sm text-slate-500 text-center mb-8">Log in to your resumes, scans, and job matches.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-center mb-2 text-slate-900">{t('auth.loginTitle')}</h1>
+        <p className="text-sm text-slate-500 text-center mb-8">{t('auth.loginSubtitle')}</p>
 
         <div className="mb-5">
           <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="email">
-            Email
+            {t('auth.email')}
           </label>
           <input
             type="email"
@@ -134,7 +139,7 @@ function LoginContent() {
 
         <div className="mb-5">
           <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="password">
-            Password
+            {t('auth.password')}
           </label>
           <div className="relative">
             <input
@@ -142,16 +147,16 @@ function LoginContent() {
               id="password"
               autoComplete="current-password"
               {...register('password')}
-              className={`w-full px-4 py-3 pr-11 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full px-4 py-3 pe-11 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.password ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
               }`}
               aria-invalid={errors.password ? 'true' : 'false'}
             />
             <button
               type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition"
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition"
               onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -164,9 +169,9 @@ function LoginContent() {
             <input
               type="checkbox"
               {...register('rememberMe')}
-              className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 mr-2"
+              className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 me-2"
             />
-            Remember me
+            {t('auth.rememberMe')}
           </label>
         </div>
 
@@ -177,15 +182,15 @@ function LoginContent() {
         )}
 
         <Button type="submit" fullWidth size="lg" loading={loading} disabled={!isValid} icon={<LogIn className="w-4 h-4" />}>
-          {loading ? 'Logging in…' : 'Log in'}
+          {loading ? t('auth.loginButtonLoading') : t('auth.loginButton')}
         </Button>
 
         <GoogleSignInButton onSuccess={onGoogleSuccess} />
 
         <p className="mt-6 text-center text-slate-500 text-sm">
-          Don&apos;t have an account?{' '}
+          {t('auth.noAccount')}{' '}
           <Link href="/register" className="text-blue-600 font-semibold hover:underline">
-            Register here
+            {t('auth.registerHere')}
           </Link>
         </p>
       </motion.form>

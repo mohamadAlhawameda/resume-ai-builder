@@ -7,6 +7,93 @@ import {
   clampScore,
   STOPWORDS,
 } from './text.js';
+import { matchFamilies } from './occupationTaxonomy.js';
+
+const DEGREE_LEVELS = [
+  { rank: 1, re: /\bhigh school\b/i },
+  { rank: 2, re: /\b(associate'?s?|diploma)\b/i },
+  { rank: 3, re: /\b(bachelor'?s?|b\.?sc|b\.?a\.?|b\.?eng|b\.?tech)\b/i },
+  { rank: 4, re: /\b(master'?s?|m\.?sc|m\.?a\.?|m\.?b\.?a|m\.?eng)\b/i },
+  { rank: 5, re: /\b(ph\.?d|doctorate)\b/i },
+];
+
+function degreeLevel(text = '') {
+  let max = 0;
+  for (const { rank, re } of DEGREE_LEVELS) if (re.test(text)) max = Math.max(max, rank);
+  return max;
+}
+
+const SENIORITY_WORDS = [
+  { rank: 1, re: /\b(intern|internship|entry.level|junior|jr\.?)\b/i },
+  { rank: 2, re: /\b(associate)\b/i },
+  { rank: 3, re: /\b(mid.level)\b/i }, // default tier when nothing else matches
+  { rank: 4, re: /\b(senior|sr\.?)\b/i },
+  { rank: 5, re: /\b(lead|principal|staff)\b/i },
+  { rank: 6, re: /\b(manager|director|head of|vp|vice president|chief|c[a-z]o)\b/i },
+];
+
+function seniorityRank(text = '') {
+  let max = 0;
+  for (const { rank, re } of SENIORITY_WORDS) if (re.test(text)) max = Math.max(max, rank);
+  return max || 3; // assume mid-level when no explicit signal
+}
+
+/** Rough total years of experience from date ranges like "Jan 2020" / "2018" / "Present". */
+function estimateExperienceYears(resumeData) {
+  const now = new Date();
+  let totalMonths = 0;
+  for (const exp of resumeData.experience || []) {
+    const from = parseLooseDate(exp.from);
+    const to = /present|current|now/i.test(exp.to || '') ? now : parseLooseDate(exp.to) || now;
+    if (from) {
+      const months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+      if (months > 0) totalMonths += months;
+    }
+  }
+  return Math.round((totalMonths / 12) * 10) / 10;
+}
+
+function parseLooseDate(str = '') {
+  if (!str) return null;
+  const yearMatch = str.match(/\b(19|20)\d{2}\b/);
+  if (!yearMatch) return null;
+  const year = parseInt(yearMatch[0], 10);
+  const monthMatch = str.match(/jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i);
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const month = monthMatch ? months.indexOf(monthMatch[0].toLowerCase().slice(0, 3)) : 0;
+  return new Date(year, month, 1);
+}
+
+/** Extract "N+ years" style requirements from qualification lines. */
+function requiredYears(qualifications) {
+  let max = 0;
+  for (const q of qualifications) {
+    const m = q.match(/(\d+)\+?\s*(?:years?|yrs?)/i);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return max;
+}
+
+/** First resume line (bullet, summary sentence, or education line) mentioning `term`. */
+function findEvidence(term, resumeData) {
+  const t = term.toLowerCase();
+  const candidates = [];
+  if (resumeData.summary) candidates.push(resumeData.summary);
+  for (const exp of resumeData.experience || []) {
+    for (const line of (exp.description || '').split('\n')) {
+      if (line.trim()) candidates.push(`${line.trim()} (${exp.role || 'role'} @ ${exp.company || 'company'})`);
+    }
+  }
+  for (const edu of resumeData.education || []) {
+    if (edu.degree) candidates.push(`${edu.degree}, ${edu.school || ''}`.trim());
+    if (edu.achievements) candidates.push(edu.achievements);
+  }
+  if (Array.isArray(resumeData.skills) && resumeData.skills.some((s) => s?.toLowerCase() === t)) {
+    candidates.push(`Listed in Skills: ${term}`);
+  }
+  const hit = candidates.find((c) => c.toLowerCase().includes(t));
+  return hit ? hit.slice(0, 160) : null;
+}
 
 /** Pull requirement-style lines (years of experience, degrees, certs) from a JD. */
 function extractQualifications(jdText) {
@@ -44,7 +131,7 @@ function extractKeywords(jdText, skills) {
  * Returns match %, matched/missing keywords & skills, missing qualifications,
  * a no-stuffing keyword plan, and deterministic bullet-rewrite templates.
  */
-export function matchResumeToJob(resumeData, jobDescription, jobTitle = '') {
+export function matchResumeToJob(resumeData, jobDescription, jobTitle = '', jobMeta = {}, prefs = {}) {
   const resumeText = resumeToText(resumeData).toLowerCase();
   const resumeTokens = new Set(tokenize(resumeText));
 
@@ -121,6 +208,78 @@ export function matchResumeToJob(resumeData, jobDescription, jobTitle = '') {
     });
   }
 
+  // ---- Qualification Evidence Map ----
+  // Every requirement (skill, qualification line, or salient keyword) mapped
+  // to the exact resume text that satisfies it, or flagged as not found.
+  const evidenceMap = [
+    ...jdSkills.map((s) => ({
+      requirement: s,
+      type: 'skill',
+      status: matchedSkills.includes(s) ? 'matched' : 'missing',
+      evidence: findEvidence(s, resumeData),
+    })),
+    ...qualifications.map((q) => ({
+      requirement: q,
+      type: 'qualification',
+      status: missingQualifications.includes(q) ? 'missing' : 'matched',
+      evidence: missingQualifications.includes(q) ? null : q,
+    })),
+    ...keywords.slice(0, 12).map((k) => ({
+      requirement: k,
+      type: 'keyword',
+      status: matchedKeywords.includes(k) ? 'matched' : 'missing',
+      evidence: findEvidence(k, resumeData),
+    })),
+  ];
+
+  // ---- Separate qualification sub-scores ----
+  const userYears = estimateExperienceYears(resumeData);
+  const neededYears = requiredYears(qualifications);
+  const experienceScore = neededYears > 0 ? clampScore((userYears / neededYears) * 100) : clampScore(50 + userYears * 8);
+
+  const jdDegree = degreeLevel(jobDescription);
+  const userDegree = Math.max(0, ...(resumeData.education || []).map((e) => degreeLevel(`${e.degree || ''}`)));
+  const educationScore = jdDegree === 0 ? 80 : clampScore(userDegree >= jdDegree ? 100 : 50 + userDegree * 15);
+
+  const jdSeniority = seniorityRank(jobTitle);
+  const userLatestTitle = (resumeData.experience || [])[0]?.role || '';
+  const userSeniority = seniorityRank(userLatestTitle);
+  const seniorityScore = clampScore(100 - Math.abs(jdSeniority - userSeniority) * 20);
+
+  const resumeFamilies = matchFamilies([...resumeSkills]);
+  const jdFamilies = matchFamilies(jdSkills.map((s) => s.toLowerCase()));
+  const industryScore =
+    resumeFamilies[0] && jdFamilies[0] && resumeFamilies[0].id === jdFamilies[0].id
+      ? 100
+      : clampScore(keywordRatio * 100);
+
+  const subScores = {
+    skills: clampScore(skillRatio * 100),
+    experience: experienceScore,
+    education: educationScore,
+    seniority: seniorityScore,
+    industry: industryScore,
+    keywords: clampScore(keywordRatio * 100),
+  };
+
+  // Location/remote/salary only computable when structured job metadata is
+  // supplied (e.g. drilling into a live feed job) — a raw pasted JD alone
+  // rarely states these unambiguously, so we don't guess.
+  if (jobMeta.location || jobMeta.remote) {
+    const locations = prefs.locations || [];
+    const locationOk =
+      jobMeta.remote === 'remote' || locations.length === 0 ||
+      locations.some((l) => (jobMeta.location || '').toLowerCase().includes(l.toLowerCase()));
+    subScores.location = clampScore(locationOk ? 100 : 40);
+
+    const remoteOk = !prefs.remote || prefs.remote === 'any' || jobMeta.remote === 'unknown' || jobMeta.remote === prefs.remote;
+    subScores.remote = clampScore(remoteOk ? 100 : 35);
+  }
+  if (jobMeta.salaryMin != null || jobMeta.salaryMax != null) {
+    const salaryOk = !prefs.salaryMin || !jobMeta.salaryMax || jobMeta.salaryMax >= prefs.salaryMin;
+    subScores.salary = clampScore(salaryOk ? 100 : 45);
+  }
+
   return {
     matchPercent,
     summary,
@@ -132,6 +291,9 @@ export function matchResumeToJob(resumeData, jobDescription, jobTitle = '') {
     keywordPlan,
     bulletRewrites,
     jobTitle: jobTitle || '',
+    subScores,
+    evidenceMap,
+    experienceYears: userYears,
   };
 }
 
@@ -203,5 +365,24 @@ export function scoreJobForUser(job, resumeData, prefs = {}) {
     matchedSkills,
     missingSkills: missingSkills.slice(0, 8),
     reasons: reasons.slice(0, 4),
+    subScores: {
+      skills: clampScore(skillRatio * 100),
+      seniority: clampScore(100 - Math.abs(seniorityRank(job.title) - seniorityRank((resumeData?.experience || [])[0]?.role || '')) * 20),
+      location: clampScore(locationMatch ? 100 : 40),
+      remote: clampScore(remoteOk ? 100 : 35),
+      salary: clampScore(salaryOk ? 100 : 45),
+    },
   };
+}
+
+/** Skill-gap summary across a set of scored live jobs — what to learn next and its payoff. */
+export function summarizeSkillGaps(scoredJobs, topN = 8) {
+  const freq = {};
+  for (const { missingSkills = [] } of scoredJobs) {
+    for (const s of missingSkills) freq[s] = (freq[s] || 0) + 1;
+  }
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .map(([skill, jobCount]) => ({ skill, jobCount }));
 }

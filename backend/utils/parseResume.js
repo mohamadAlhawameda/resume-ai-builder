@@ -41,14 +41,38 @@ export async function extractTextFromFile(buffer, mimetype, filename = '') {
 // ---------------------------------------------------------------------------
 
 const SECTION_ALIASES = {
-  summary: ['summary', 'professional summary', 'summary of qualifications', 'profile', 'professional profile', 'about', 'about me', 'objective', 'career objective', 'personal statement', 'overview'],
-  experience: ['experience', 'work experience', 'professional experience', 'employment', 'employment history', 'work history', 'career history', 'relevant experience', 'professional background'],
-  education: ['education', 'education & training', 'education and training', 'academic background', 'academics', 'academic history'],
-  skills: ['skills', 'technical skills', 'core competencies', 'key skills', 'skills & tools', 'skills and tools', 'technologies', 'tech stack', 'areas of expertise', 'core skills', 'competencies', 'expertise'],
-  projects: ['projects', 'personal projects', 'key projects', 'academic projects', 'selected projects', 'notable projects', 'portfolio'],
-  certifications: ['certifications', 'certificates', 'licenses', 'licenses & certifications', 'certifications & licenses', 'licenses and certifications', 'certifications and licenses', 'professional development', 'courses', 'training'],
-  languages: ['languages', 'language skills'],
-  other: ['awards', 'honors', 'honours', 'achievements', 'awards & honors', 'volunteer', 'volunteering', 'volunteer experience', 'interests', 'hobbies', 'publications', 'references', 'additional information', 'activities'],
+  summary: [
+    'summary', 'professional summary', 'summary of qualifications', 'profile', 'professional profile', 'about', 'about me', 'objective', 'career objective', 'personal statement', 'overview',
+    'الملخص المهني', 'ملخص', 'نبذة عني', 'نبذة شخصية', 'الملخص الشخصي', 'الهدف الوظيفي', 'نظرة عامة',
+  ],
+  experience: [
+    'experience', 'work experience', 'professional experience', 'employment', 'employment history', 'work history', 'career history', 'relevant experience', 'professional background',
+    'الخبرة العملية', 'الخبرات العملية', 'الخبرة المهنية', 'الخبرات', 'التاريخ الوظيفي', 'الخبرة الوظيفية',
+  ],
+  education: [
+    'education', 'education & training', 'education and training', 'academic background', 'academics', 'academic history',
+    'التعليم', 'المؤهلات العلمية', 'المؤهل الدراسي', 'الخلفية الأكاديمية', 'التحصيل العلمي',
+  ],
+  skills: [
+    'skills', 'technical skills', 'core competencies', 'key skills', 'skills & tools', 'skills and tools', 'technologies', 'tech stack', 'areas of expertise', 'core skills', 'competencies', 'expertise',
+    'المهارات', 'المهارات التقنية', 'المهارات الأساسية', 'الكفاءات', 'مجالات الخبرة',
+  ],
+  projects: [
+    'projects', 'personal projects', 'key projects', 'academic projects', 'selected projects', 'notable projects', 'portfolio',
+    'المشاريع', 'المشاريع الشخصية', 'مشاريع مختارة',
+  ],
+  certifications: [
+    'certifications', 'certificates', 'licenses', 'licenses & certifications', 'certifications & licenses', 'licenses and certifications', 'certifications and licenses', 'professional development', 'courses', 'training',
+    'الشهادات', 'الشهادات المهنية', 'الدورات التدريبية', 'التدريب', 'الشهادات والتراخيص',
+  ],
+  languages: [
+    'languages', 'language skills',
+    'اللغات', 'المهارات اللغوية',
+  ],
+  other: [
+    'awards', 'honors', 'honours', 'achievements', 'awards & honors', 'volunteer', 'volunteering', 'volunteer experience', 'interests', 'hobbies', 'publications', 'references', 'additional information', 'activities',
+    'الجوائز', 'الإنجازات', 'العمل التطوعي', 'الأنشطة', 'الاهتمامات', 'معلومات إضافية', 'المراجع',
+  ],
 };
 
 const HEADER_LOOKUP = new Map();
@@ -95,11 +119,14 @@ export function extractContact(text) {
   }
 
   // City: look for "City, XX" / "City, Country" fragments near the contact info.
+  const ARABIC_WORD = "[\\u0600-\\u06FF\\u0750-\\u077F .'\\-]{1,40}";
+  const CITY_RE_EN = /^([A-Z][A-Za-z .'\-]{1,40}),\s*([A-Z][A-Za-z .'\-]{1,40})$/;
+  const CITY_RE_AR = new RegExp(`^(${ARABIC_WORD})[,،]\\s*(${ARABIC_WORD})$`);
   const topLines = text.split('\n').slice(0, 12);
   for (const line of topLines) {
-    for (const part of line.split(/[|•·;]+/)) {
+    for (const part of line.split(/[|•·;؛]+/)) {
       const p = part.trim();
-      const m = p.match(/^([A-Z][A-Za-z .'\-]{1,40}),\s*([A-Z][A-Za-z .'\-]{1,40})$/);
+      const m = p.match(CITY_RE_EN) || p.match(CITY_RE_AR);
       if (m && !EMAIL_RE.test(p) && digitCount(p) === 0) {
         contact.city = p;
         break;
@@ -110,6 +137,11 @@ export function extractContact(text) {
   return contact;
 }
 
+// Arabic block (؀-ۿ) plus presentation forms sometimes seen in
+// exported PDFs (ݐ-ݿ, ﭐ-﷿, ﹰ-﻿).
+const NAME_CHARS = "A-Za-z\\u0600-\\u06FF\\u0750-\\u077F\\uFB50-\\uFDFF\\uFE70-\\uFEFF .'\\-";
+const NAME_RE = new RegExp(`^[${NAME_CHARS}]+$`);
+
 function extractName(lines) {
   for (const line of lines.slice(0, 6)) {
     const t = line.trim();
@@ -117,7 +149,7 @@ function extractName(lines) {
     if (EMAIL_RE.test(t) || /https?:|linkedin|github|@/i.test(t)) continue;
     if (headerKeyFor(t)) continue;
     const words = t.split(/\s+/);
-    if (words.length >= 2 && words.length <= 4 && /^[A-Za-z][A-Za-z .'\-]+$/.test(t)) {
+    if (words.length >= 2 && words.length <= 4 && NAME_RE.test(t)) {
       return t;
     }
   }
@@ -128,12 +160,14 @@ function extractName(lines) {
 // Dates
 // ---------------------------------------------------------------------------
 
-const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
+const MONTH_EN = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
+// Arabic month names (Gregorian, as commonly written on Arabic resumes).
+const MONTH_AR = '(?:يناير|فبراير|مارس|أبريل|إبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)';
+const MONTH = `(?:${MONTH_EN}|${MONTH_AR})`;
 const ONE_DATE = `(?:${MONTH}\\s+\\d{4}|\\d{1,2}[/.]\\d{4}|\\d{4})`;
-const RANGE_RE = new RegExp(
-  `(${ONE_DATE})\\s*(?:–|—|−|-|to|until|→)\\s*(${ONE_DATE}|present|current|now|ongoing|today)`,
-  'i'
-);
+const PRESENT_WORDS = 'present|current|now|ongoing|today|الآن|حاليا|حالياً|مستمر|الحاضر';
+const TO_WORDS = '–|—|−|-|to|until|→|إلى|حتى';
+const RANGE_RE = new RegExp(`(${ONE_DATE})\\s*(?:${TO_WORDS})\\s*(${ONE_DATE}|${PRESENT_WORDS})`, 'i');
 const YEAR_RE = /\b(19|20)\d{2}\b/;
 
 function findDateRange(line) {
@@ -167,8 +201,8 @@ export function splitSections(text) {
 // Experience / project entries
 // ---------------------------------------------------------------------------
 
-const TITLE_WORDS = /\b(engineer|developer|manager|director|analyst|designer|consultant|specialist|coordinator|assistant|associate|lead|architect|administrator|intern|officer|scientist|technician|accountant|nurse|teacher|writer|marketer|recruiter|founder|owner|president|vp|head|supervisor|representative|agent|clerk|therapist|advisor)\b/i;
-const COMPANY_HINTS = /\b(inc|llc|ltd|corp|corporation|company|co|gmbh|technologies|solutions|systems|labs|group|studio|agency|university|hospital|bank|consulting|software|media|partners)\b\.?/i;
+const TITLE_WORDS = /\b(engineer|developer|manager|director|analyst|designer|consultant|specialist|coordinator|assistant|associate|lead|architect|administrator|intern|officer|scientist|technician|accountant|nurse|teacher|writer|marketer|recruiter|founder|owner|president|vp|head|supervisor|representative|agent|clerk|therapist|advisor)\b|مهندس|مطور|مدير|محلل|مصمم|استشاري|منسق|مسؤول|رئيس|مشرف|محاسب|معلم|كاتب|مندوب/i;
+const COMPANY_HINTS = /\b(inc|llc|ltd|corp|corporation|company|co|gmbh|technologies|solutions|systems|labs|group|studio|agency|university|hospital|bank|consulting|software|media|partners)\b\.?|شركة|مؤسسة|مجموعة|جامعة|مستشفى|بنك/i;
 const BULLET_RE = /^\s*[•·▪◦*\-–—]\s+/;
 
 function splitRoleCompany(headerLines, anchorRemainder) {
@@ -289,8 +323,8 @@ export function parseEntries(lines) {
 // Education
 // ---------------------------------------------------------------------------
 
-const DEGREE_RE = /\b(bachelor|master|ph\.?d|doctorate|associate|diploma|certificate|b\.?sc?|m\.?sc?|b\.?a|m\.?a|m\.?b\.?a|b\.?eng|m\.?eng|b\.?tech|m\.?tech|b\.?com|m\.?com|high school)\b/i;
-const SCHOOL_RE = /\b(university|college|institute|school|academy|polytechnic)\b/i;
+const DEGREE_RE = /\b(bachelor|master|ph\.?d|doctorate|associate|diploma|certificate|b\.?sc?|m\.?sc?|b\.?a|m\.?a|m\.?b\.?a|b\.?eng|m\.?eng|b\.?tech|m\.?tech|b\.?com|m\.?com|high school)\b|بكالوريوس|ماجستير|دكتوراه|دبلوم|شهادة/i;
+const SCHOOL_RE = /\b(university|college|institute|school|academy|polytechnic)\b|جامعة|كلية|معهد|مدرسة|أكاديمية/i;
 
 export function parseEducation(lines) {
   const entries = [];
@@ -347,7 +381,7 @@ export function parseSkillList(lines) {
     if (colon > 0 && colon < 35 && line.slice(0, colon).split(/\s+/).length <= 4) {
       line = line.slice(colon + 1);
     }
-    for (const part of line.split(/[,;•·|/]+/)) {
+    for (const part of line.split(/[,;•·|/،؛]+/)) {
       const s = part.trim().replace(/\.$/, '');
       if (s.length >= 2 && s.length <= 50 && !skills.some((x) => x.toLowerCase() === s.toLowerCase())) {
         skills.push(s);
@@ -360,6 +394,14 @@ export function parseSkillList(lines) {
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
+
+/** Heuristic script detection — enough to pick a resume language default. */
+export function detectLanguage(text) {
+  const arabicChars = (text.match(/[؀-ۿ]/g) || []).length;
+  const latinChars = (text.match(/[A-Za-z]/g) || []).length;
+  if (arabicChars > 20 && arabicChars > latinChars * 0.3) return 'ar';
+  return 'en';
+}
 
 export function parseResumeText(text) {
   const cleaned = text.replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n');
@@ -453,6 +495,7 @@ export function parseResumeText(text) {
       education: education.slice(0, 20),
       experience: experience.slice(0, 30),
       skills,
+      language: detectLanguage(cleaned),
     },
     warnings,
     confidence,

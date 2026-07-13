@@ -37,9 +37,17 @@ import {
   type ScanHistoryItem,
   type ScanCategoryKey,
   type ImportResumeResult,
+  type AtsPreviewResult,
 } from '@/lib/types';
 
-type Tab = 'scan' | 'match';
+type Tab = 'scan' | 'match' | 'ats';
+
+interface PendingJobMeta {
+  location?: string;
+  remote?: string;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+}
 
 function AnalyzeContent() {
   const router = useRouter();
@@ -59,6 +67,11 @@ function AnalyzeContent() {
   const [jobDescription, setJobDescription] = useState('');
   const [matching, setMatching] = useState(false);
   const [match, setMatch] = useState<JobMatchResult | null>(null);
+  const [jobMeta, setJobMeta] = useState<PendingJobMeta>({});
+
+  // ATS preview state
+  const [atsLoading, setAtsLoading] = useState(false);
+  const [atsPreview, setAtsPreview] = useState<AtsPreviewResult | null>(null);
 
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [importInfo, setImportInfo] = useState<ImportResumeResult | null>(null);
@@ -89,6 +102,16 @@ function AnalyzeContent() {
       setJobDescription(jd);
       setTab('match');
       sessionStorage.removeItem('analyze:jobDescription');
+    }
+    // Structured metadata from a live job card enables location/remote/salary sub-scores.
+    const metaRaw = sessionStorage.getItem('analyze:jobMeta');
+    if (metaRaw) {
+      try {
+        setJobMeta(JSON.parse(metaRaw));
+      } catch {
+        /* ignore malformed */
+      }
+      sessionStorage.removeItem('analyze:jobMeta');
     }
   }, [router, searchParams]);
 
@@ -147,7 +170,15 @@ function AnalyzeContent() {
     try {
       const result = await api<JobMatchResult>('/analysis/job-match', {
         method: 'POST',
-        body: { resumeId: selectedResume, jobDescription, jobTitle },
+        body: {
+          resumeId: selectedResume,
+          jobDescription,
+          jobTitle,
+          jobLocation: jobMeta.location || '',
+          jobRemote: jobMeta.remote || '',
+          jobSalaryMin: jobMeta.salaryMin ?? null,
+          jobSalaryMax: jobMeta.salaryMax ?? null,
+        },
       });
       setMatch(result);
       refreshHistory();
@@ -155,6 +186,26 @@ function AnalyzeContent() {
       toast.error(apiErrorMessage(err, 'Comparison failed — please try again.'));
     } finally {
       setMatching(false);
+    }
+  };
+
+  const runAtsPreview = async () => {
+    if (!selectedResume) {
+      toast.info('Create a resume first.');
+      return;
+    }
+    setAtsLoading(true);
+    setAtsPreview(null);
+    try {
+      const result = await api<AtsPreviewResult>('/analysis/ats-preview', {
+        method: 'POST',
+        body: { resumeId: selectedResume },
+      });
+      setAtsPreview(result);
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Could not generate the ATS preview.'));
+    } finally {
+      setAtsLoading(false);
     }
   };
 
@@ -224,6 +275,7 @@ function AnalyzeContent() {
                     [
                       { id: 'scan', label: 'Resume scan', icon: ScanSearch },
                       { id: 'match', label: 'Job match', icon: Briefcase },
+                      { id: 'ats', label: 'ATS preview', icon: FileText },
                     ] as const
                   ).map(({ id, label, icon: Icon }) => (
                     <button
@@ -274,13 +326,19 @@ function AnalyzeContent() {
               )}
 
               <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
-                {tab === 'scan' ? (
+                {tab === 'scan' && (
                   <Button icon={<ScanSearch className="w-4 h-4" />} loading={scanning} onClick={() => runScan()} size="lg">
                     {scanning ? 'Scanning…' : 'Scan my resume'}
                   </Button>
-                ) : (
+                )}
+                {tab === 'match' && (
                   <Button icon={<Briefcase className="w-4 h-4" />} loading={matching} onClick={runMatch} size="lg">
                     {matching ? 'Comparing…' : 'Compare with job'}
+                  </Button>
+                )}
+                {tab === 'ats' && (
+                  <Button icon={<FileText className="w-4 h-4" />} loading={atsLoading} onClick={runAtsPreview} size="lg">
+                    {atsLoading ? 'Analyzing…' : 'Preview ATS parsing'}
                   </Button>
                 )}
                 <ImportResumeButton onImported={handleImported} label="Import another resume" />
@@ -481,6 +539,33 @@ function AnalyzeContent() {
                     </div>
                   </Card>
 
+                  {match.subScores && (
+                    <Card>
+                      <h3 className="font-semibold text-slate-900 mb-3">Qualification breakdown</h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {(
+                          Object.entries(match.subScores) as [string, number][]
+                        ).map(([key, value]) => (
+                          <div key={key} className="border border-slate-100 rounded-xl p-3">
+                            <p className="text-xs text-slate-500 capitalize mb-1">{key}</p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${value}%`,
+                                    backgroundColor: value >= 75 ? '#059669' : value >= 50 ? '#2563eb' : '#d97706',
+                                  }}
+                                />
+                              </div>
+                              <span className="text-xs font-semibold text-slate-700">{value}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+
                   <div className="grid sm:grid-cols-2 gap-6">
                     <Card>
                       <h3 className="font-semibold text-slate-900 mb-3">✓ You already match</h3>
@@ -566,6 +651,93 @@ function AnalyzeContent() {
                       </div>
                     </Card>
                   )}
+
+                  {match.evidenceMap && match.evidenceMap.length > 0 && (
+                    <Card>
+                      <h3 className="font-semibold text-slate-900 mb-1">Qualification Evidence Map</h3>
+                      <p className="text-sm text-slate-500 mb-4">
+                        Every requirement in the posting, linked to the exact evidence in your resume — or flagged as
+                        not found.
+                      </p>
+                      <div className="space-y-2">
+                        {match.evidenceMap.map((e, i) => (
+                          <div key={i} className="flex items-start gap-3 border border-slate-100 rounded-xl p-3">
+                            <Badge tone={e.status === 'matched' ? 'green' : 'red'} className="shrink-0 mt-0.5">
+                              {e.status === 'matched' ? '✓' : '✗'}
+                            </Badge>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-900">{e.requirement}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {e.evidence ? `Evidence: “${e.evidence}”` : 'Not found in your resume.'}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+                </motion.div>
+              )}
+
+              {/* ---------- ATS Preview results ---------- */}
+              {tab === 'ats' && atsPreview && (
+                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                  <Card>
+                    <h3 className="font-semibold text-slate-900 mb-3">Recruiter&apos;s first 6 seconds</h3>
+                    <div className="space-y-1.5 text-sm text-slate-700">
+                      <p><span className="text-slate-500">Name:</span> {atsPreview.recruiterFirstImpression.name}</p>
+                      <p><span className="text-slate-500">Headline:</span> {atsPreview.recruiterFirstImpression.headline || '—'}</p>
+                      {atsPreview.recruiterFirstImpression.mostRecentRole && (
+                        <p><span className="text-slate-500">Most recent role:</span> {atsPreview.recruiterFirstImpression.mostRecentRole}</p>
+                      )}
+                    </div>
+                    {atsPreview.recruiterFirstImpression.topBullets.length > 0 && (
+                      <ul className="mt-3 space-y-1.5">
+                        {atsPreview.recruiterFirstImpression.topBullets.map((b, i) => (
+                          <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" aria-hidden /> {b}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {atsPreview.recruiterFirstImpression.topSkills.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {atsPreview.recruiterFirstImpression.topSkills.map((s) => (
+                          <Badge key={s} tone="blue">{s}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+
+                  {atsPreview.flags.length > 0 && (
+                    <Card>
+                      <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden /> Formatting risks
+                      </h3>
+                      <div className="space-y-2">
+                        {atsPreview.flags.map((f, i) => (
+                          <div key={i} className="flex items-start gap-2 text-sm">
+                            <Badge tone={f.severity === 'high' ? 'red' : f.severity === 'medium' ? 'amber' : 'slate'} className="shrink-0 mt-0.5">
+                              {f.severity}
+                            </Badge>
+                            <p className="text-slate-700">{f.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+
+                  <Card>
+                    <h3 className="font-semibold text-slate-900 mb-3">What an ATS parser extracts</h3>
+                    <div className="space-y-3 max-h-96 overflow-y-auto thin-scrollbar">
+                      {atsPreview.sections.map((s, i) => (
+                        <div key={i} className="border border-slate-100 rounded-xl p-3">
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{s.label}</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-line">{s.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
                 </motion.div>
               )}
             </AnimatePresence>

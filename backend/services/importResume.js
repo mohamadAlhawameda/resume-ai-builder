@@ -77,7 +77,7 @@ function sanitizeAiResult(ai, source) {
 async function aiStructure(source) {
   const out = await chatJSON({
     system:
-      'You are a resume parser. Extract structured data from raw resume text. STRICT RULES: copy every value VERBATIM from the text — never invent, infer, paraphrase, or embellish anything. If a field is not present, use an empty string or empty array. Dates: copy as written. Description: the entry\'s bullet lines joined with \\n, each copied exactly. Return JSON: {"fullName":"","title":"","city":"","summary":"","skills":["..."],"experience":[{"company":"","role":"","from":"","to":"","description":""}],"education":[{"school":"","degree":"","from":"","to":"","achievements":""}]}',
+      'You are a resume parser. Extract structured data from raw resume text. STRICT RULES: copy every value VERBATIM from the text, in whatever language it is written (Arabic, English, French, or mixed) — never translate, invent, infer, paraphrase, or embellish anything. If a field is not present, use an empty string or empty array. Dates: copy as written. Description: the entry\'s bullet lines joined with \\n, each copied exactly. Return JSON: {"fullName":"","title":"","city":"","summary":"","skills":["..."],"experience":[{"company":"","role":"","from":"","to":"","description":""}],"education":[{"school":"","degree":"","from":"","to":"","achievements":""}]}',
     user: `Resume text:\n\n${truncate(source, 7000)}`,
     maxTokens: 1800,
   });

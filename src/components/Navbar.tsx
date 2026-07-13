@@ -15,6 +15,8 @@ import {
   LogOut,
   ChevronDown,
   FilePlus2,
+  Radar,
+  UserCircle2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -22,20 +24,25 @@ import useAuthStatus from '@/app/hooks/useAuthStatus';
 import { getUser, clearSession } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { APP_NAME_PRIMARY, APP_NAME_ACCENT } from '@/lib/config';
+import { useLocale } from '@/i18n/LocaleProvider';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import type { AppNotification } from '@/lib/types';
 
 const NAV_LINKS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, auth: true },
-  { href: '/resume', label: 'Builder', icon: FilePlus2, auth: false },
-  { href: '/resumes', label: 'My Resumes', icon: FileText, auth: true },
-  { href: '/analyze', label: 'Analyze', icon: ScanSearch, auth: true },
-  { href: '/jobs', label: 'Jobs', icon: Briefcase, auth: true },
-  { href: '/tools', label: 'AI Tools', icon: Sparkles, auth: true },
+  { href: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard, auth: true },
+  { href: '/resume', labelKey: 'nav.builder', icon: FilePlus2, auth: false },
+  { href: '/resumes', labelKey: 'nav.myResumes', icon: FileText, auth: true },
+  { href: '/analyze', labelKey: 'nav.analyze', icon: ScanSearch, auth: true },
+  { href: '/jobs', labelKey: 'nav.jobs', icon: Briefcase, auth: true },
+  { href: '/radar', labelKey: 'nav.radar', icon: Radar, auth: true },
+  { href: '/profile', labelKey: 'nav.profile', icon: UserCircle2, auth: true },
+  { href: '/tools', labelKey: 'nav.aiTools', icon: Sparkles, auth: true },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -117,7 +124,7 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <nav className="hidden lg:flex items-center gap-1" aria-label="Primary">
-          {links.map(({ href, label, icon: Icon }) => (
+          {links.map(({ href, labelKey, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -130,7 +137,7 @@ export default function Navbar() {
               )}
             >
               <Icon className="w-4 h-4" aria-hidden />
-              {label}
+              {t(labelKey)}
             </Link>
           ))}
         </nav>
@@ -165,17 +172,17 @@ export default function Navbar() {
                       className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden"
                     >
                       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                        <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                        <span className="text-sm font-semibold text-slate-900">{t('nav.notifications')}</span>
                         {unread > 0 && (
                           <button onClick={markAllRead} className="text-xs font-medium text-blue-600 hover:underline">
-                            Mark all read
+                            {t('nav.markAllRead')}
                           </button>
                         )}
                       </div>
                       <div className="max-h-80 overflow-y-auto thin-scrollbar">
                         {notifications.length === 0 ? (
                           <p className="px-4 py-8 text-center text-sm text-slate-500">
-                            No notifications yet. Strong job matches will appear here.
+                            {t('nav.noNotifications')}
                           </p>
                         ) : (
                           notifications.map((n) => (
@@ -203,7 +210,7 @@ export default function Navbar() {
                           href="/jobs"
                           className="block px-4 py-2.5 text-center text-sm font-medium text-blue-600 hover:bg-blue-50 border-t border-slate-100 transition"
                         >
-                          View job matches
+                          {t('nav.viewJobMatches')}
                         </Link>
                       )}
                     </motion.div>
@@ -243,7 +250,7 @@ export default function Navbar() {
                         role="menuitem"
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition"
                       >
-                        <LogOut className="w-4 h-4" aria-hidden /> Log out
+                        <LogOut className="w-4 h-4" aria-hidden /> {t('nav.logout')}
                       </button>
                     </motion.div>
                   )}
@@ -260,17 +267,19 @@ export default function Navbar() {
                     isActive('/login') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   )}
                 >
-                  Log in
+                  {t('nav.login')}
                 </Link>
                 <Link
                   href="/register"
                   className="text-sm px-4 py-2 bg-gradient-to-b from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
                 >
-                  Get started
+                  {t('nav.getStarted')}
                 </Link>
               </div>
             )
           )}
+
+          <LanguageSwitcher className="hidden md:block" />
 
           {/* Mobile hamburger */}
           <button
@@ -296,7 +305,7 @@ export default function Navbar() {
             aria-label="Mobile"
           >
             <div className="px-4 py-3 space-y-1">
-              {links.map(({ href, label, icon: Icon }) => (
+              {links.map(({ href, labelKey, icon: Icon }) => (
                 <Link
                   key={href}
                   href={href}
@@ -310,9 +319,13 @@ export default function Navbar() {
                   )}
                 >
                   <Icon className="w-5 h-5" aria-hidden />
-                  {label}
+                  {t(labelKey)}
                 </Link>
               ))}
+
+              <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <LanguageSwitcher />
+              </div>
 
               <div className="pt-2 mt-2 border-t border-slate-100">
                 {isClient && isAuthenticated ? (
@@ -323,7 +336,7 @@ export default function Navbar() {
                     }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition"
                   >
-                    <LogOut className="w-5 h-5" aria-hidden /> Log out
+                    <LogOut className="w-5 h-5" aria-hidden /> {t('nav.logout')}
                   </button>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 pt-1">
@@ -332,14 +345,14 @@ export default function Navbar() {
                       onClick={() => setIsOpen(false)}
                       className="text-center text-sm font-medium px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
                     >
-                      Log in
+                      {t('nav.login')}
                     </Link>
                     <Link
                       href="/register"
                       onClick={() => setIsOpen(false)}
                       className="text-center text-sm px-4 py-2.5 bg-gradient-to-b from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
                     >
-                      Get started
+                      {t('nav.getStarted')}
                     </Link>
                   </div>
                 )}

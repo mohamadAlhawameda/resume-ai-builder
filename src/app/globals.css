@@ -19,6 +19,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Arabic locale: swap the whole app to a font with proper Arabic shaping. */
+html.font-arabic body {
+  font-family: var(--font-arabic), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* RTL: mirror directional icons (chevrons/arrows) that visually imply
+   direction of travel; text and layout already flip via `dir` + logical
+   Tailwind utilities. */
+html[dir='rtl'] .rtl-flip {
+  transform: scaleX(-1);
+}
+
 /* Legacy input classes kept for backward compatibility */
 .input-field,
 .input {

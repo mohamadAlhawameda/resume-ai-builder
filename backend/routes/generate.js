@@ -139,6 +139,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
 
   const resumeText = truncate(resumeToText(data), 3500);
   const jd = truncate(body.jobDescription, 3500);
+  const language = data.language || 'en';
 
   try {
     switch (type) {
@@ -147,6 +148,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
           system:
             'You are an expert resume writer. Write professional summaries: 2–4 sentences, third person implied (no "I"), specific, keyword-rich but natural, no clichés like "team player". Return JSON: {"suggestions":["...","...","..."]} with 3 distinct options.',
           user: `Target role: ${body.targetRole || data.targetRole || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}${jd ? `\n\nTailor toward this job description:\n${jd}` : ''}`,
+          language,
         });
         return res.json({ suggestions: (out.suggestions || []).slice(0, 3), aiUsed: true });
       }
@@ -160,6 +162,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
           system:
             'You are an expert resume writer. Rewrite the given job description into 3–5 strong resume bullets. Each starts with a powerful action verb, is one line, and includes a measurable result where the input supports it (never invent metrics — use [X%] placeholders instead). Return JSON: {"suggestions":["...","..."]}',
           user: `Role: ${exp.role || ''} at ${exp.company || ''}\n\nCurrent description:\n${truncate(exp.description, 2000)}`,
+          language,
         });
         return res.json({ suggestions: (out.suggestions || []).slice(0, 5), aiUsed: true });
       }
@@ -169,6 +172,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
           system:
             'You are a resume expert. Based on the resume, suggest 10–12 skills the candidate plausibly has but may not have listed: mix technical and interpersonal, specific over generic. Return JSON: {"suggestions":["skill1","skill2",...]}',
           user: `Resume:\n${resumeText}\n\nAlready listed: ${(data.skills || []).join(', ') || 'none'}${jd ? `\n\nPrioritize skills relevant to:\n${jd}` : ''}`,
+          language,
         });
         return res.json({ suggestions: (out.suggestions || []).slice(0, 12), aiUsed: true });
       }
@@ -178,6 +182,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
           system:
             'You are a resume coach. Draft 4–6 achievement bullet templates grounded in the candidate\'s actual experience, each starting with an action verb and containing a [placeholder] where they should insert their real metric. Never fabricate specific numbers. Return JSON: {"suggestions":["..."]}',
           user: `Resume:\n${resumeText}`,
+          language,
         });
         return res.json({ suggestions: (out.suggestions || []).slice(0, 6), aiUsed: true });
       }
@@ -188,6 +193,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'You are an expert cover letter writer. Write a concise (250–350 word), specific cover letter grounded ONLY in the resume provided — never invent employers, titles, or accomplishments. Structure: hook tied to the company/role, 1–2 paragraphs mapping the candidate\'s real achievements to the job requirements, brief close. No placeholder brackets unless information is missing. Plain text, no markdown.',
           user: `Job title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nJob description:\n${jd || 'not provided'}\n\nResume:\n${resumeText}`,
           maxTokens: 700,
+          language,
         });
         return res.json({ text, aiUsed: true });
       }
@@ -198,6 +204,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Write a LinkedIn "About" section (120–200 words) in first person: authentic, specific, results-oriented, light on buzzwords, ending with what the person is looking for. Ground it only in the resume provided. Plain text.',
           user: `Target role: ${body.targetRole || data.targetRole || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}`,
           maxTokens: 450,
+          language,
         });
         return res.json({ text, aiUsed: true });
       }
@@ -208,6 +215,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Write a short professional bio (40–70 words, third person) suitable for a portfolio or conference page. Ground it only in the resume provided. Plain text.',
           user: `Resume:\n${resumeText}`,
           maxTokens: 200,
+          language,
         });
         return res.json({ text, aiUsed: true });
       }
@@ -224,6 +232,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Rewrite resume bullets to align with a job description WITHOUT inventing experience. Keep real metrics, use the job\'s terminology only where truthful. Return JSON: {"rewrites":[{"original":"...","improved":"...","reason":"..."}]}',
           user: `Job description:\n${jd}\n\nBullets:\n${bullets.map((b) => `- ${b}`).join('\n')}`,
           maxTokens: 1000,
+          language,
         });
         return res.json({ rewrites: (out.rewrites || []).slice(0, 8), aiUsed: true });
       }
@@ -234,6 +243,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'You are an experienced interviewer and career coach. Based on the candidate\'s resume and (if given) the job posting, generate 8–10 realistic interview questions they should prepare for: a mix of behavioral, technical/role-specific (grounded in skills they actually list), motivation, and one or two probing questions about gaps or transitions visible in the resume. For each question give a STAR-method preparation hint that references their real experience — never fabricate accomplishments for them. Return JSON: {"questions":[{"question":"...","category":"behavioral|technical|motivation|general","starHint":"..."}]}',
           user: `Job title: ${body.jobTitle || body.targetRole || 'not specified'}\nCompany: ${body.company || 'not specified'}\n\nJob description:\n${jd || 'not provided'}\n\nResume:\n${resumeText}`,
           maxTokens: 1400,
+          language,
         });
         const questions = (out.questions || [])
           .filter((q) => q && q.question)
@@ -253,6 +263,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Write LinkedIn headlines (max 220 characters each): specific, keyword-rich, no fluff like "passionate" or "guru". Ground them only in the resume provided. Return JSON: {"suggestions":["...","...","..."]} with 3–4 distinct options.',
           user: `Target role: ${body.targetRole || data.targetRole || 'not specified'}\n\nResume:\n${resumeText}`,
           maxTokens: 300,
+          language,
         });
         return res.json({ suggestions: (out.suggestions || []).map((s) => String(s).slice(0, 220)).slice(0, 4), aiUsed: true });
       }
@@ -263,6 +274,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Write a short LinkedIn/email message (80–130 words) from a candidate to a recruiter about a specific role. Professional, direct, no groveling. Reference only real experience from the resume — never invent qualifications. Plain text, no markdown, no subject line.',
           user: `Recipient: ${body.recipientName || 'the recruiter'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nJob description:\n${jd || 'not provided'}\n\nResume:\n${resumeText}`,
           maxTokens: 350,
+          language,
         });
         return res.json({ text, aiUsed: true });
       }
@@ -273,6 +285,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Write a polite, concise follow-up email (90–140 words) for a job application that has not received a response. Include a subject line on the first line ("Subject: ..."). Reaffirm interest, reference one genuinely relevant strength from the resume, and close with a light call to action. Never invent experience. Plain text.',
           user: `Recipient: ${body.recipientName || 'the hiring team'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}`,
           maxTokens: 350,
+          language,
         });
         return res.json({ text, aiUsed: true });
       }
@@ -283,6 +296,7 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Write a post-interview thank-you email (90–140 words) with a subject line on the first line ("Subject: ..."). Warm but professional: thank them, reinforce fit with one real strength from the resume, and leave a placeholder like [something specific you discussed] for the personal touch — never fabricate interview details. Plain text.',
           user: `Recipient: ${body.recipientName || 'the interviewer'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}`,
           maxTokens: 350,
+          language,
         });
         return res.json({ text, aiUsed: true });
       }

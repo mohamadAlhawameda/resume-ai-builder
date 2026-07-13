@@ -9,10 +9,13 @@ import User from '../models/User.js';
 import Resume from '../models/Resume.js';
 import SavedJob from '../models/SavedJob.js';
 import Notification from '../models/Notification.js';
+import CareerProfile from '../models/CareerProfile.js';
 import { fetchAllJobs, usingSampleData } from '../providers/jobs/index.js';
-import { scoreJobForUser } from '../utils/jobMatch.js';
+import { scoreJobForUser, summarizeSkillGaps } from '../utils/jobMatch.js';
 import { validateBody, jobPreferencesSchema } from '../utils/validate.js';
 import { sendJobAlertEmail, sendApplicationStatusEmail } from '../services/email.js';
+import { matchFamilies, adjacentFamilies } from '../utils/occupationTaxonomy.js';
+import { findSkillsInText } from '../utils/text.js';
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -28,7 +31,25 @@ async function getContext(userId, resumeId) {
   if (!resume) {
     resume = await Resume.findOne({ userId }).sort({ updatedAt: -1 });
   }
-  return { user, resumeData: resume?.data || {}, resumeId: resume?._id || null };
+  let resumeData = resume?.data || {};
+
+  // No resume yet (or it's thin) — fall back to the Career Digital Twin so
+  // matching still works for users who've filled in a profile but haven't
+  // built a formal resume yet.
+  if (!(resumeData.experience?.length || resumeData.skills?.length)) {
+    const profile = await CareerProfile.findOne({ userId });
+    if (profile && (profile.experience?.length || profile.skills?.length)) {
+      resumeData = {
+        ...resumeData,
+        summary: resumeData.summary || profile.careerGoals || '',
+        experience: resumeData.experience?.length ? resumeData.experience : profile.experience || [],
+        education: resumeData.education?.length ? resumeData.education : profile.education || [],
+        skills: resumeData.skills?.length ? resumeData.skills : (profile.skills || []).map((s) => s.name),
+      };
+    }
+  }
+
+  return { user, resumeData, resumeId: resume?._id || null };
 }
 
 // Create alert notifications for strong matches the user hasn't been told about.
@@ -220,6 +241,177 @@ router.delete('/saved/:id', async (req, res) => {
     const deleted = await SavedJob.findOneAndDelete({ _id: req.params.id, userId: req.user.userId });
     if (!deleted) return res.status(404).json({ message: 'Saved job not found' });
     res.json({ message: 'Removed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Opportunity Radar — jobs you qualify for now, jobs you're close to
+// qualifying for, adjacent career paths, and companies actively hiring for
+// your profile. All computed deterministically from the live job feed.
+// ---------------------------------------------------------------------------
+
+// GET /jobs/radar?resumeId=...
+router.get('/radar', async (req, res) => {
+  try {
+    const { user, resumeData, resumeId } = await getContext(req.user.userId, req.query.resumeId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const jobs = await fetchAllJobs();
+    const prefs = user.jobPreferences?.toObject ? user.jobPreferences.toObject() : (user.jobPreferences || {});
+    const scored = jobs.map((job) => ({ ...job, match: scoreJobForUser(job, resumeData, prefs) }));
+
+    const qualifyNow = scored
+      .filter((j) => j.match.percent >= 75)
+      .sort((a, b) => b.match.percent - a.match.percent)
+      .slice(0, 12);
+
+    const qualifySoon = scored
+      .filter((j) => j.match.percent >= 50 && j.match.percent < 75 && j.match.missingSkills.length <= 2)
+      .sort((a, b) => b.match.percent - a.match.percent)
+      .slice(0, 12);
+
+    // Companies with several roles a reasonable fit for this profile.
+    const byCompany = new Map();
+    for (const j of scored) {
+      if (j.match.percent < 40) continue;
+      const key = j.company;
+      const entry = byCompany.get(key) || { company: key, jobCount: 0, avgMatch: 0, totalMatch: 0 };
+      entry.jobCount += 1;
+      entry.totalMatch += j.match.percent;
+      byCompany.set(key, entry);
+    }
+    const companiesHiring = [...byCompany.values()]
+      .map((c) => ({ company: c.company, jobCount: c.jobCount, avgMatch: Math.round(c.totalMatch / c.jobCount) }))
+      .sort((a, b) => b.jobCount - a.jobCount || b.avgMatch - a.avgMatch)
+      .slice(0, 8);
+
+    // Adjacent career paths: occupation families with meaningful (but not
+    // dominant) skill overlap, plus a couple of live openings in that family
+    // so the suggestion is concrete, not abstract.
+    const resumeSkillsLower = findSkillsInText(resumeToTextSafe(resumeData)).map((s) => s.toLowerCase());
+    const primary = matchFamilies(resumeSkillsLower)[0];
+    const adjacent = adjacentFamilies(resumeSkillsLower, primary?.id, 3).map((fam) => {
+      const openings = scored
+        .filter((j) => (j.skills || []).some((s) => fam.matchedSkills.includes(s.toLowerCase())))
+        .sort((a, b) => b.match.percent - a.match.percent)
+        .slice(0, 3)
+        .map((j) => ({ id: j.id, title: j.title, company: j.company, matchPercent: j.match.percent }));
+      return { family: fam.title, matchedSkills: fam.matchedSkills, openings };
+    }).filter((a) => a.openings.length > 0);
+
+    res.json({
+      qualifyNow,
+      qualifySoon,
+      companiesHiring,
+      adjacentPaths: adjacent,
+      resumeId,
+      sampleData: usingSampleData(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+function resumeToTextSafe(resumeData) {
+  const parts = [resumeData?.summary || ''];
+  for (const e of resumeData?.experience || []) parts.push(e.description || '');
+  if (Array.isArray(resumeData?.skills)) parts.push(resumeData.skills.join(' '));
+  return parts.join(' ');
+}
+
+// ---------------------------------------------------------------------------
+// Skill Impact Simulator — "if I add this skill, what changes?"
+// ---------------------------------------------------------------------------
+
+const simulateSchema = Joi.object({
+  resumeId: Joi.string().hex().length(24).optional(),
+  addSkills: Joi.array().items(Joi.string().max(120)).min(1).max(5).required(),
+});
+
+router.post('/simulate', validateBody(simulateSchema), async (req, res) => {
+  try {
+    const { user, resumeData } = await getContext(req.user.userId, req.body.resumeId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const jobs = await fetchAllJobs();
+    const prefs = user.jobPreferences?.toObject ? user.jobPreferences.toObject() : (user.jobPreferences || {});
+
+    const before = jobs.map((j) => scoreJobForUser(j, resumeData, prefs));
+    const augmented = { ...resumeData, skills: [...(resumeData.skills || []), ...req.body.addSkills] };
+    const after = jobs.map((j) => scoreJobForUser(j, augmented, prefs));
+
+    const avg = (arr) => (arr.length ? arr.reduce((s, x) => s + x.percent, 0) / arr.length : 0);
+    const qualifyingCount = (arr, threshold = 75) => arr.filter((x) => x.percent >= threshold).length;
+
+    const newlyQualifying = jobs
+      .map((j, i) => ({ job: j, before: before[i].percent, after: after[i].percent }))
+      .filter((x) => x.before < 75 && x.after >= 75)
+      .sort((a, b) => b.after - a.after)
+      .slice(0, 5)
+      .map((x) => ({ id: x.job.id, title: x.job.title, company: x.job.company, before: x.before, after: x.after }));
+
+    res.json({
+      addedSkills: req.body.addSkills,
+      avgMatchBefore: Math.round(avg(before)),
+      avgMatchAfter: Math.round(avg(after)),
+      qualifyingJobsBefore: qualifyingCount(before),
+      qualifyingJobsAfter: qualifyingCount(after),
+      totalJobsConsidered: jobs.length,
+      newlyQualifying,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Application Intelligence — which titles/skills/match-ranges correlate with
+// better outcomes in this user's own tracked applications.
+// ---------------------------------------------------------------------------
+
+router.get('/insights', async (req, res) => {
+  try {
+    const saved = await SavedJob.find({ userId: req.user.userId });
+    const tracked = saved.filter((s) => s.status !== 'saved');
+
+    const byStatus = {};
+    for (const s of saved) byStatus[s.status] = (byStatus[s.status] || 0) + 1;
+
+    const avgMatchByStatus = {};
+    for (const status of ['applied', 'interviewing', 'offer', 'rejected']) {
+      const withMatch = saved.filter((s) => s.status === status && typeof s.matchPercent === 'number');
+      if (withMatch.length) {
+        avgMatchByStatus[status] = Math.round(
+          withMatch.reduce((sum, s) => sum + s.matchPercent, 0) / withMatch.length
+        );
+      }
+    }
+
+    const positiveOutcomes = saved.filter((s) => ['interviewing', 'offer'].includes(s.status));
+    const skillFreq = {};
+    for (const s of positiveOutcomes) {
+      for (const skill of s.job?.skills || []) skillFreq[skill] = (skillFreq[skill] || 0) + 1;
+    }
+    const topSkillsInPositiveOutcomes = Object.entries(skillFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([skill, count]) => ({ skill, count }));
+
+    res.json({
+      totalTracked: tracked.length,
+      byStatus,
+      avgMatchByStatus,
+      topSkillsInPositiveOutcomes,
+      sampleSizeNote:
+        tracked.length < 5
+          ? 'Track more applications to get statistically meaningful patterns — these are early signals.'
+          : null,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

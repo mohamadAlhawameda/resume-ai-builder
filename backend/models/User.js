@@ -52,8 +52,12 @@ const UserSchema = new mongoose.Schema(
       minlength: [6, 'Password must be at least 6 characters long'],
       select: false, // Prevent returning password in queries by default
     },
-    // Google account id (`sub` claim) for "Sign in with Google".
-    googleId: { type: String, default: null, index: { unique: true, sparse: true } },
+    // Google account id (`sub` claim) for "Sign in with Google". No `default`
+    // on purpose: a sparse unique index only skips documents where the field
+    // is entirely ABSENT, not ones where it's explicitly null — a default of
+    // null would give every password-only user the same indexed value and
+    // break registration after the first user (E11000 on googleId_1).
+    googleId: { type: String, index: { unique: true, sparse: true } },
     // Personalization used for recommendations and job matching
     targetRole: { type: String, default: '', trim: true, maxlength: 120 },
     industry: { type: String, default: '', trim: true, maxlength: 120 },

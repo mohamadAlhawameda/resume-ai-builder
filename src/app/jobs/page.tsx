@@ -196,6 +196,12 @@ function JobsContent() {
 
   const handleAnalyzeAgainstJob = (job: Job) => {
     sessionStorage.setItem('analyze:jobDescription', job.description);
+    // Structured metadata enables location/remote/salary rows in the
+    // Qualification Evidence Map that a raw pasted JD alone can't provide.
+    sessionStorage.setItem(
+      'analyze:jobMeta',
+      JSON.stringify({ location: job.location, remote: job.remote, salaryMin: job.salaryMin, salaryMax: job.salaryMax })
+    );
     router.push(`/analyze?tab=match&jobTitle=${encodeURIComponent(job.title)}`);
   };
 

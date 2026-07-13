@@ -24,7 +24,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { scoreColor } from '@/components/ui/ScoreRing';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getUser, isLoggedIn, type StoredUser } from '@/lib/auth';
-import type { ResumeRecord, ScanHistoryItem, SavedJob, Job } from '@/lib/types';
+import type { ResumeRecord, ScanHistoryItem, SavedJob, Job, NextAction } from '@/lib/types';
 
 interface Profile {
   targetRole: string;
@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile>({ targetRole: '', industry: '' });
   const [editingTarget, setEditingTarget] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [nextAction, setNextAction] = useState<NextAction | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -59,6 +60,7 @@ export default function DashboardPage() {
         api<SavedJob[]>('/jobs/saved'),
         api<{ jobs: Job[] }>('/jobs/recommended'),
         api<{ user: { targetRole: string; industry: string } }>('/auth/me'),
+        api<NextAction>('/profile/next-action'),
       ]);
       if (results[0].status === 'fulfilled') setResumes(results[0].value);
       if (results[1].status === 'fulfilled') setHistory(results[1].value);
@@ -70,6 +72,7 @@ export default function DashboardPage() {
           industry: results[4].value.user.industry || '',
         });
       }
+      if (results[5].status === 'fulfilled') setNextAction(results[5].value);
       if (results[0].status === 'rejected') {
         toast.error(apiErrorMessage(results[0].reason, 'Could not load your resumes.'));
       }
@@ -192,6 +195,21 @@ export default function DashboardPage() {
           </Button>
         </div>
       </motion.div>
+
+      {/* Career Concierge — always the one next best action */}
+      {nextAction && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-8">
+          <div className="flex items-center gap-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl px-5 py-4 shadow-md shadow-blue-600/20">
+            <span className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4.5 h-4.5 text-white" aria-hidden />
+            </span>
+            <p className="text-sm text-white flex-1">{nextAction.action}</p>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => router.push(nextAction.href)}>
+              Go <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">

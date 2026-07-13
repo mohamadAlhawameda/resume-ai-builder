@@ -31,9 +31,11 @@ export default function ResumePreview({ data, template }: ResumePreviewProps) {
   const Template = TEMPLATES[key] || ClassicTemplate;
   // Executive/Creative paint their own edge-to-edge headers.
   const framed = key !== 'executive' && key !== 'creative';
+  const isRtl = data.language === 'ar';
 
   return (
     <div
+      dir={isRtl ? 'rtl' : 'ltr'}
       style={{
         backgroundColor: '#ffffff',
         color: '#000000',
@@ -43,6 +45,9 @@ export default function ResumePreview({ data, template }: ResumePreviewProps) {
         boxSizing: 'border-box',
         padding: framed ? '2rem' : 0,
         overflow: 'hidden',
+        // System fonts with solid Arabic glyph coverage — avoids async
+        // web-font loading races during html2canvas PDF capture.
+        fontFamily: isRtl ? 'Tahoma, Arial, "Segoe UI", sans-serif' : undefined,
       }}
       className="print:p-0 print:m-0 print:shadow-none print:border-none print:rounded-none print:bg-white"
     >

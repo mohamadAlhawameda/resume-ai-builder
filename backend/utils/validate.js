@@ -30,6 +30,7 @@ export const resumeDataSchema = Joi.object({
   summary: Joi.string().allow('').max(5000),
   title: Joi.string().allow('').max(160),
   targetRole: Joi.string().allow('').max(160),
+  language: Joi.string().valid('en', 'ar', 'fr').default('en'),
   education: Joi.array()
     .items(
       Joi.object({

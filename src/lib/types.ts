@@ -60,6 +60,8 @@ export interface ResumeData {
   sectionOrder?: SectionKey[];
   hiddenSections?: SectionKey[];
   customization?: TemplateCustomization;
+  /** Content language — drives RTL rendering, export direction, and AI response language. */
+  language?: 'en' | 'ar' | 'fr';
 }
 
 export type TemplateId = 'classic' | 'modern' | 'minimal' | 'executive' | 'creative';
@@ -147,6 +149,10 @@ export interface JobMatchResult {
   keywordPlan: string[];
   jobTitle?: string;
   createdAt?: string;
+  /** Present once JobSubScores/evidence map utils are wired (Qualification Evidence Map). */
+  subScores?: JobSubScores;
+  evidenceMap?: EvidenceMapEntry[];
+  experienceYears?: number;
 }
 
 export interface ScanHistoryItem {
@@ -273,6 +279,7 @@ export function emptyResumeData(): ResumeData {
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     hiddenSections: [],
     customization: { ...DEFAULT_CUSTOMIZATION },
+    language: 'en',
   };
 }
 
@@ -295,6 +302,172 @@ export function normalizeResumeData(raw: Partial<ResumeData> | null | undefined)
       : [],
     customization: { ...DEFAULT_CUSTOMIZATION, ...(raw.customization || {}) },
   };
+}
+
+// ---------- Career Digital Twin / Vault / GPS / Passport ----------
+
+export interface EvidenceSkill {
+  name: string;
+  proficiency: 'familiar' | 'proficient' | 'expert';
+  evidence?: string;
+  source: 'user' | 'resume-import' | 'ai-confirmed';
+}
+
+export interface ProfileProject {
+  _id?: string;
+  name: string;
+  description: string;
+  skills: string[];
+  url: string;
+  from: string;
+  to: string;
+}
+
+export interface ProfileCertification {
+  _id?: string;
+  name: string;
+  issuer: string;
+  issuedDate: string;
+  expiryDate: string;
+  credentialUrl: string;
+}
+
+export interface ProfileLanguage {
+  name: string;
+  proficiency: 'basic' | 'conversational' | 'professional' | 'fluent' | 'native';
+}
+
+export interface VaultItem {
+  _id: string;
+  type: 'bullet' | 'achievement' | 'project' | 'story';
+  title: string;
+  text: string;
+  metric: string;
+  tags: string[];
+  source: 'user' | 'resume-import' | 'ai-confirmed';
+  createdAt: string;
+}
+
+export interface RoadmapItem {
+  text: string;
+  done: boolean;
+}
+
+export interface CareerRoadmap {
+  targetRole: string;
+  generatedAt: string | null;
+  thirtyDay: RoadmapItem[];
+  ninetyDay: RoadmapItem[];
+  longTerm: RoadmapItem[];
+}
+
+export interface PassportSettings {
+  enabled: boolean;
+  slug: string | null;
+  headline: string;
+  showProjects: boolean;
+  showCertifications: boolean;
+  resumeId: string | null;
+  viewCount: number;
+}
+
+export interface CareerProfile {
+  _id: string;
+  userId: string;
+  experience: Experience[];
+  education: Education[];
+  skills: EvidenceSkill[];
+  projects: ProfileProject[];
+  certifications: ProfileCertification[];
+  languages: ProfileLanguage[];
+  vault: VaultItem[];
+  careerGoals: string;
+  targetRoles: string[];
+  roadmap: CareerRoadmap;
+  passport: PassportSettings;
+  completionPct: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NextAction {
+  action: string;
+  href: string;
+}
+
+/** Sub-scores shown in the Qualification Evidence Map. */
+export interface JobSubScores {
+  skills?: number;
+  experience?: number;
+  education?: number;
+  seniority?: number;
+  industry?: number;
+  keywords?: number;
+  location?: number;
+  remote?: number;
+  salary?: number;
+}
+
+export interface EvidenceMapEntry {
+  requirement: string;
+  type: 'skill' | 'qualification' | 'keyword';
+  status: 'matched' | 'missing';
+  evidence: string | null;
+}
+
+export interface AtsPreviewResult {
+  sections: { label: string; text: string }[];
+  flags: { severity: 'low' | 'medium' | 'high'; message: string }[];
+  recruiterFirstImpression: {
+    name: string;
+    headline: string | null;
+    mostRecentRole: string | null;
+    topBullets: string[];
+    topSkills: string[];
+  };
+  plainText: string;
+}
+
+export interface RadarJob extends Job {
+  match: NonNullable<Job['match']>;
+}
+
+export interface OpportunityRadar {
+  qualifyNow: RadarJob[];
+  qualifySoon: RadarJob[];
+  companiesHiring: { company: string; jobCount: number; avgMatch: number }[];
+  adjacentPaths: { family: string; matchedSkills: string[]; openings: { id: string; title: string; company: string; matchPercent: number }[] }[];
+  sampleData: boolean;
+}
+
+export interface SkillSimulationResult {
+  addedSkills: string[];
+  avgMatchBefore: number;
+  avgMatchAfter: number;
+  qualifyingJobsBefore: number;
+  qualifyingJobsAfter: number;
+  totalJobsConsidered: number;
+  newlyQualifying: { id: string; title: string; company: string; before: number; after: number }[];
+}
+
+/** Public, privacy-safe view of a Career Passport (no auth, no contact info). */
+export interface PublicPassport {
+  name: string;
+  headline: string;
+  experience: Experience[];
+  education: Education[];
+  skills: string[];
+  projects: ProfileProject[];
+  certifications: ProfileCertification[];
+  resume: { data: ResumeData; templateId: string; title: string } | null;
+}
+
+export interface ApplicationInsights {
+  totalTracked: number;
+  byStatus: Record<string, number>;
+  avgMatchByStatus: Record<string, number>;
+  topSkillsInPositiveOutcomes: { skill: string; count: number }[];
+  sampleSizeNote: string | null;
 }
 
 /** Rough profile completeness used on the dashboard and builder. */

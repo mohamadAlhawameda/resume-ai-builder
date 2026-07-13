@@ -16,6 +16,7 @@ import analysisRoutes from './routes/analysis.js';
 import generateRoutes from './routes/generate.js';
 import jobsRoutes from './routes/jobs.js';
 import notificationRoutes from './routes/notifications.js';
+import profileRoutes from './routes/profile.js';
 import { usingSampleData } from './providers/jobs/index.js';
 
 const app = express();
@@ -57,6 +58,7 @@ app.use('/analysis', analysisRoutes);
 app.use('/generate', generateRoutes);
 app.use('/jobs', jobsRoutes);
 app.use('/notifications', notificationRoutes);
+app.use('/profile', profileRoutes);
 
 // Central error handler — malformed JSON, oversized payloads, etc.
 app.use((err, req, res, next) => {
