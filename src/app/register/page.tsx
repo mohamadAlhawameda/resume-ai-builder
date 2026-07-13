@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Button from '@/components/ui/Button';
+import GoogleSignInButton, { type GoogleAuthResult } from '@/components/GoogleSignInButton';
 import { api, apiErrorMessage } from '@/lib/api';
 import { storeSession, type StoredUser } from '@/lib/auth';
 
@@ -71,32 +72,47 @@ function RegisterContent() {
         return;
       }
 
-      storeSession(result.token, result.user, true);
-
-      // Guest built a resume, then registered to save it
-      if (searchParams.get('redirect') === 'saveResume') {
-        const resumeDataToSave = localStorage.getItem('resumeDataToSave');
-        if (resumeDataToSave) {
-          try {
-            await api('/resume/create', {
-              method: 'POST',
-              body: { data: JSON.parse(resumeDataToSave) },
-            });
-            localStorage.removeItem('resumeDataToSave');
-          } catch (err) {
-            console.error('Resume auto-save error:', err);
-          }
-        }
-        router.push('/dashboard');
-        return;
-      }
-
-      router.push('/resume');
+      await completeSignup(result);
     } catch (err) {
       setError(apiErrorMessage(err, 'Registration failed'));
     } finally {
       setLoading(false);
     }
+  };
+
+  // Shared post-signup flow for password and Google registrations.
+  const completeSignup = async (result: { token: string; user: StoredUser }) => {
+    storeSession(result.token, result.user, true);
+
+    // Guest built a resume, then registered to save it
+    if (searchParams.get('redirect') === 'saveResume') {
+      const resumeDataToSave = localStorage.getItem('resumeDataToSave');
+      if (resumeDataToSave) {
+        try {
+          await api('/resume/create', {
+            method: 'POST',
+            body: { data: JSON.parse(resumeDataToSave) },
+          });
+          localStorage.removeItem('resumeDataToSave');
+        } catch (err) {
+          console.error('Resume auto-save error:', err);
+        }
+      }
+      router.push('/dashboard');
+      return;
+    }
+
+    router.push('/resume');
+  };
+
+  const onGoogleSuccess = (result: GoogleAuthResult) => {
+    // Returning users who click Google on the register page go to their dashboard.
+    if (result.isNewUser === false && searchParams.get('redirect') !== 'saveResume') {
+      storeSession(result.token, result.user, true);
+      router.push('/dashboard');
+      return;
+    }
+    completeSignup(result);
   };
 
   const inputClass = (hasError: boolean) =>
@@ -229,6 +245,8 @@ function RegisterContent() {
         <Button type="submit" fullWidth size="lg" loading={loading} disabled={!isValid} icon={<UserPlus className="w-4 h-4" />}>
           {loading ? 'Creating account…' : 'Create account'}
         </Button>
+
+        <GoogleSignInButton onSuccess={onGoogleSuccess} />
 
         <p className="mt-6 text-center text-sm text-slate-500">
           Already have an account?{' '}

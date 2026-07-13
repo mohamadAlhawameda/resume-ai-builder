@@ -59,6 +59,9 @@ const leverProvider = {
             description,
             skills: findSkillsInText(`${p.text} ${description}`).slice(0, 12),
             isSampleData: false,
+            // ISO country code straight from the Lever API — authoritative
+            // even when the display location is just "Hybrid"/"In-Office".
+            countryHint: p.country || '',
           });
         }
       } catch (err) {

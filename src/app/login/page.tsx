@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Button from '@/components/ui/Button';
+import GoogleSignInButton, { type GoogleAuthResult } from '@/components/GoogleSignInButton';
 import { api, apiErrorMessage } from '@/lib/api';
 import { storeSession, type StoredUser } from '@/lib/auth';
 
@@ -36,6 +37,39 @@ function LoginContent() {
     resolver: zodResolver(schema),
   });
 
+  // Shared post-auth flow for password and Google logins.
+  const completeLogin = async (result: { token: string; user: StoredUser }, remember: boolean) => {
+    storeSession(result.token, result.user, remember);
+
+    const redirectAction = searchParams.get('redirect');
+
+    // Guest built a resume, then logged in to save it
+    if (redirectAction === 'saveResume') {
+      const resumeDataToSave = localStorage.getItem('resumeDataToSave');
+      if (resumeDataToSave) {
+        try {
+          await api('/resume/create', {
+            method: 'POST',
+            body: { data: JSON.parse(resumeDataToSave) },
+          });
+          localStorage.removeItem('resumeDataToSave');
+        } catch (saveErr) {
+          console.error('Resume save error after login:', saveErr);
+        }
+      }
+      router.push('/dashboard');
+      return;
+    }
+
+    // Path-style redirect (e.g. /login?redirect=/analyze)
+    if (redirectAction && redirectAction.startsWith('/')) {
+      router.push(redirectAction);
+      return;
+    }
+
+    router.push('/dashboard');
+  };
+
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     setError(null);
@@ -52,40 +86,16 @@ function LoginContent() {
         return;
       }
 
-      storeSession(result.token, result.user, !!data.rememberMe);
-
-      const redirectAction = searchParams.get('redirect');
-
-      // Guest built a resume, then logged in to save it
-      if (redirectAction === 'saveResume') {
-        const resumeDataToSave = localStorage.getItem('resumeDataToSave');
-        if (resumeDataToSave) {
-          try {
-            await api('/resume/create', {
-              method: 'POST',
-              body: { data: JSON.parse(resumeDataToSave) },
-            });
-            localStorage.removeItem('resumeDataToSave');
-          } catch (saveErr) {
-            console.error('Resume save error after login:', saveErr);
-          }
-        }
-        router.push('/dashboard');
-        return;
-      }
-
-      // Path-style redirect (e.g. /login?redirect=/analyze)
-      if (redirectAction && redirectAction.startsWith('/')) {
-        router.push(redirectAction);
-        return;
-      }
-
-      router.push('/dashboard');
+      await completeLogin(result, !!data.rememberMe);
     } catch (err) {
       setError(apiErrorMessage(err, 'Login failed. Please check your credentials.'));
     } finally {
       setLoading(false);
     }
+  };
+
+  const onGoogleSuccess = (result: GoogleAuthResult) => {
+    completeLogin(result, true);
   };
 
   return (
@@ -165,6 +175,8 @@ function LoginContent() {
         <Button type="submit" fullWidth size="lg" loading={loading} disabled={!isValid} icon={<LogIn className="w-4 h-4" />}>
           {loading ? 'Logging in…' : 'Log in'}
         </Button>
+
+        <GoogleSignInButton onSuccess={onGoogleSuccess} />
 
         <p className="mt-6 text-center text-slate-500 text-sm">
           Don&apos;t have an account?{' '}

@@ -40,6 +40,12 @@ import {
 
 type Tab = 'recommended' | 'saved' | 'preferences';
 
+const CA_PROVINCES = new Set([
+  'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador',
+  'Nova Scotia', 'Northwest Territories', 'Nunavut', 'Ontario', 'Prince Edward Island',
+  'Quebec', 'Saskatchewan', 'Yukon',
+]);
+
 const STATUS_OPTIONS: { value: SavedJobStatus; label: string; tone: 'slate' | 'blue' | 'purple' | 'green' | 'red' }[] = [
   { value: 'saved', label: 'Saved', tone: 'slate' },
   { value: 'applied', label: 'Applied', tone: 'blue' },
@@ -73,6 +79,8 @@ function JobsContent() {
   // Filters
   const [query, setQuery] = useState('');
   const [remoteFilter, setRemoteFilter] = useState('any');
+  const [countryFilter, setCountryFilter] = useState<'any' | 'CA' | 'US'>('any');
+  const [regionFilter, setRegionFilter] = useState('any');
   const [minMatch, setMinMatch] = useState(0);
   const [sortBy, setSortBy] = useState<'match' | 'date' | 'salary'>('match');
 
@@ -106,6 +114,22 @@ function JobsContent() {
 
   const savedIds = useMemo(() => new Set(savedJobs.map((s) => s.job?.id)), [savedJobs]);
 
+  // Provinces/states available for the selected country, from the loaded jobs.
+  // Dual-country postings carry regions from both sides, so keep only the
+  // regions that actually belong to the selected country.
+  const regionOptions = useMemo(() => {
+    if (countryFilter === 'any') return [];
+    const set = new Set<string>();
+    for (const j of jobs) {
+      if (!j.countries?.includes(countryFilter)) continue;
+      for (const r of j.regions || []) {
+        const isProvince = CA_PROVINCES.has(r);
+        if ((countryFilter === 'CA') === isProvince) set.add(r);
+      }
+    }
+    return [...set].sort();
+  }, [jobs, countryFilter]);
+
   const filteredJobs = useMemo(() => {
     let list = jobs.filter((j) => {
       if (query) {
@@ -113,6 +137,8 @@ function JobsContent() {
         if (!`${j.title} ${j.company} ${j.location} ${j.skills.join(' ')}`.toLowerCase().includes(q)) return false;
       }
       if (remoteFilter !== 'any' && j.remote !== remoteFilter) return false;
+      if (countryFilter !== 'any' && !j.countries?.includes(countryFilter)) return false;
+      if (regionFilter !== 'any' && !j.regions?.includes(regionFilter)) return false;
       if ((j.match?.percent ?? 0) < minMatch) return false;
       return true;
     });
@@ -122,7 +148,7 @@ function JobsContent() {
       return new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime();
     });
     return list;
-  }, [jobs, query, remoteFilter, minMatch, sortBy]);
+  }, [jobs, query, remoteFilter, countryFilter, regionFilter, minMatch, sortBy]);
 
   const handleSave = async (job: Job) => {
     setBusyJob(job.id);
@@ -278,6 +304,34 @@ function JobsContent() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <select
+                      value={countryFilter}
+                      onChange={(e) => {
+                        setCountryFilter(e.target.value as typeof countryFilter);
+                        setRegionFilter('any');
+                      }}
+                      aria-label="Filter by country"
+                      className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="any">🌎 US & Canada</option>
+                      <option value="CA">🇨🇦 Canada</option>
+                      <option value="US">🇺🇸 United States</option>
+                    </select>
+                    {countryFilter !== 'any' && regionOptions.length > 0 && (
+                      <select
+                        value={regionFilter}
+                        onChange={(e) => setRegionFilter(e.target.value)}
+                        aria-label={countryFilter === 'CA' ? 'Filter by province' : 'Filter by state'}
+                        className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="any">{countryFilter === 'CA' ? 'All provinces' : 'All states'}</option>
+                        {regionOptions.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <select
                       value={remoteFilter}
                       onChange={(e) => setRemoteFilter(e.target.value)}
                       aria-label="Filter by work style"
@@ -359,6 +413,11 @@ function JobsContent() {
                             <div className="flex gap-1.5 mt-2 flex-wrap">
                               <Badge tone="slate">{job.remote}</Badge>
                               {job.workType && <Badge tone="slate">{job.workType}</Badge>}
+                              {job.countries?.includes('CA') && <Badge tone="blue">🇨🇦 Canada</Badge>}
+                              {job.countries?.includes('US') && <Badge tone="blue">🇺🇸 US</Badge>}
+                              {(job.regions || []).slice(0, 3).map((r) => (
+                                <Badge key={r} tone="slate">{r}</Badge>
+                              ))}
                             </div>
                           </div>
                           {job.match && (
@@ -467,9 +526,9 @@ function JobsContent() {
                             href={job.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-600 transition px-2 py-1.5"
+                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
                           >
-                            View posting <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+                            Apply on company site <ExternalLink className="w-3.5 h-3.5" aria-hidden />
                           </a>
                         )}
                       </div>

@@ -49,7 +49,7 @@ const greenhouseProvider = {
             provider: 'greenhouse',
             externalId: String(job.id),
             title: job.title || 'Untitled role',
-            company: prettyCompanyName(board),
+            company: job.company_name || prettyCompanyName(board),
             location: job.location?.name || 'Not specified',
             remote: /remote/i.test(job.location?.name || '') ? 'remote' : 'unknown',
             workType: 'full-time',

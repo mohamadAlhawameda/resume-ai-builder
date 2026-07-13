@@ -12,7 +12,7 @@ import Notification from '../models/Notification.js';
 import { fetchAllJobs, usingSampleData } from '../providers/jobs/index.js';
 import { scoreJobForUser } from '../utils/jobMatch.js';
 import { validateBody, jobPreferencesSchema } from '../utils/validate.js';
-import { sendJobAlertEmail } from '../services/email.js';
+import { sendJobAlertEmail, sendApplicationStatusEmail } from '../services/email.js';
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -139,6 +139,8 @@ const saveJobSchema = Joi.object({
     url: Joi.string().allow('').max(2000).default(''),
     description: Joi.string().allow('').max(20000).default(''),
     skills: Joi.array().items(Joi.string().max(120)).max(30).default([]),
+    countries: Joi.array().items(Joi.string().length(2)).max(5).default([]),
+    regions: Joi.array().items(Joi.string().max(60)).max(20).default([]),
     postedAt: Joi.string().allow('', null).default(null),
     isSampleData: Joi.boolean().default(false),
   }).required(),
@@ -191,6 +193,19 @@ router.patch('/saved/:id', validateBody(statusSchema), async (req, res) => {
       { new: true }
     );
     if (!saved) return res.status(404).json({ message: 'Saved job not found' });
+
+    // Milestone emails (applied / interviewing / offer) with next-step tips —
+    // only for users who opted into email in their job preferences.
+    if (['applied', 'interviewing', 'offer'].includes(req.body.status)) {
+      User.findById(req.user.userId)
+        .then((user) => {
+          if (user?.jobPreferences?.emailAlerts) {
+            return sendApplicationStatusEmail(user, saved, req.body.status);
+          }
+        })
+        .catch(() => {});
+    }
+
     res.json(saved);
   } catch (err) {
     console.error(err);

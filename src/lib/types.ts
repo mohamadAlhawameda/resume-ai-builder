@@ -200,6 +200,10 @@ export interface Job {
   url?: string;
   description: string;
   skills: string[];
+  /** ISO country codes the posting is open to — subset of ['US','CA']. */
+  countries?: string[];
+  /** Normalized state/province names, e.g. ['Ontario','California']. */
+  regions?: string[];
   postedAt?: string;
   isSampleData: boolean;
   match?: {

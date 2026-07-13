@@ -8,8 +8,23 @@
 import mockProvider from './mock.js';
 import greenhouseProvider from './greenhouse.js';
 import leverProvider from './lever.js';
+import { parseJobLocation, allowedCountries } from '../../utils/jobLocation.js';
 
 const REAL_PROVIDERS = [greenhouseProvider, leverProvider];
+
+// Attach normalized geography and drop postings outside the served markets
+// (JOB_COUNTRIES, default US + Canada; set to "all" to disable).
+function normalizeGeography(rawJobs) {
+  const allowed = allowedCountries();
+  const jobs = [];
+  for (const raw of rawJobs) {
+    const { countryHint, ...job } = raw;
+    const { countries, regions } = parseJobLocation(job.location, countryHint);
+    if (allowed && !countries.some((c) => allowed.has(c))) continue;
+    jobs.push({ ...job, countries, regions });
+  }
+  return jobs;
+}
 
 // Feeds are cached briefly so repeated dashboard/job-page loads stay fast and
 // we stay respectful of upstream APIs.
@@ -32,9 +47,9 @@ export async function fetchAllJobs({ force = false } = {}) {
   }
   const providers = activeProviders();
   const settled = await Promise.allSettled(providers.map((p) => p.fetchJobs()));
-  const jobs = settled
-    .filter((s) => s.status === 'fulfilled')
-    .flatMap((s) => s.value);
+  const jobs = normalizeGeography(
+    settled.filter((s) => s.status === 'fulfilled').flatMap((s) => s.value)
+  );
 
   if (jobs.length > 0) {
     cache = { at: now, jobs };

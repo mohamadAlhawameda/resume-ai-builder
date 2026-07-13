@@ -42,10 +42,18 @@ const UserSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      // Google-only accounts have no password.
+      required: [
+        function () {
+          return !this.googleId;
+        },
+        'Password is required',
+      ],
       minlength: [6, 'Password must be at least 6 characters long'],
       select: false, // Prevent returning password in queries by default
     },
+    // Google account id (`sub` claim) for "Sign in with Google".
+    googleId: { type: String, default: null, index: { unique: true, sparse: true } },
     // Personalization used for recommendations and job matching
     targetRole: { type: String, default: '', trim: true, maxlength: 120 },
     industry: { type: String, default: '', trim: true, maxlength: 120 },
