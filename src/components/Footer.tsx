@@ -1,65 +1,91 @@
 'use client';
 
 import Link from 'next/link';
-import { Mail, Github, Linkedin } from 'lucide-react';
+import { Mail, Github, Linkedin, FileText } from 'lucide-react';
+import { APP_NAME } from '@/lib/config';
+
+const PRODUCT_LINKS = [
+  { href: '/resume', label: 'Resume Builder' },
+  { href: '/analyze', label: 'Resume Scanner' },
+  { href: '/jobs', label: 'Job Matching' },
+  { href: '/tools', label: 'AI Tools' },
+];
+
+const COMPANY_LINKS = [
+  { href: '/', label: 'Home' },
+  { href: '/faq', label: 'FAQ' },
+  { href: '/register', label: 'Create Account' },
+];
 
 export default function Footer() {
   return (
-    <footer className="bg-white border-t border-gray-200 text-gray-700">
-      <div className="max-w-7xl mx-auto px-6 py-16 grid md:grid-cols-5 gap-12 text-sm">
+    <footer className="bg-white border-t border-slate-200 text-slate-700">
+      <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 text-sm">
         {/* Brand */}
-        <div className="md:col-span-2 flex flex-col justify-between">
-          <h2 className="text-3xl font-extrabold text-blue-600 mb-4 tracking-tight select-none">
-            AI Resume Builder
-          </h2>
-          <p className="text-gray-600 leading-relaxed max-w-md">
-            Create standout resumes effortlessly with our AI-enhanced tools. Designed for students, professionals, and job seekers aiming to shine.
+        <div className="sm:col-span-2">
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold text-slate-900 mb-4">
+            <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+              <FileText className="w-4 h-4" aria-hidden />
+            </span>
+            {APP_NAME.slice(0, 6)}
+            <span className="text-blue-600 -ml-2">{APP_NAME.slice(6)}</span>
+          </Link>
+          <p className="text-slate-500 leading-relaxed max-w-md">
+            Build standout resumes, scan them against ATS criteria, and discover jobs that
+            actually match your experience — powered by AI.
           </p>
 
-          {/* Social Icons */}
-          <div className="flex space-x-6 mt-6">
+          <div className="flex space-x-5 mt-6">
             {[
-              { href: "mailto:alhawameda4@gmail.com", label: "Email", icon: Mail },
-              { href: "https://github.com/mohamadAlhawameda", label: "GitHub", icon: Github },
-              { href: "https://www.linkedin.com/in/mohammad-alhawamdeh/", label: "LinkedIn", icon: Linkedin },
+              { href: 'mailto:alhawameda4@gmail.com', label: 'Email', icon: Mail },
+              { href: 'https://github.com/mohamadAlhawameda', label: 'GitHub', icon: Github },
+              { href: 'https://www.linkedin.com/in/mohammad-alhawamdeh/', label: 'LinkedIn', icon: Linkedin },
             ].map(({ href, label, icon: Icon }) => (
               <a
                 key={label}
                 href={href}
                 aria-label={label}
-                target={href.startsWith("http") ? "_blank" : undefined}
-                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="text-gray-500 hover:text-blue-600 transition-colors duration-300 ease-in-out"
+                target={href.startsWith('http') ? '_blank' : undefined}
+                rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                className="text-slate-400 hover:text-blue-600 transition-colors duration-200"
               >
-                <Icon className="w-6 h-6" />
+                <Icon className="w-5 h-5" />
               </a>
             ))}
           </div>
         </div>
 
-        {/* Company Links */}
-        <div className="flex flex-col justify-start">
-          <h4 className="text-base font-semibold text-gray-900 mb-5 tracking-wide uppercase">
-            Company
-          </h4>
-          <ul className="space-y-3">
-            <li>
-              <Link
-                href="/"
-                className="text-gray-600 hover:text-blue-600 transition-colors duration-200 ease-in-out font-medium"
-              >
-                Home
-              </Link>
-            </li>
-           
-         
+        {/* Product */}
+        <nav aria-label="Product">
+          <h4 className="text-sm font-semibold text-slate-900 mb-4 tracking-wide uppercase">Product</h4>
+          <ul className="space-y-2.5">
+            {PRODUCT_LINKS.map(({ href, label }) => (
+              <li key={href}>
+                <Link href={href} className="text-slate-500 hover:text-blue-600 transition-colors">
+                  {label}
+                </Link>
+              </li>
+            ))}
           </ul>
-        </div>
+        </nav>
+
+        {/* Company */}
+        <nav aria-label="Company">
+          <h4 className="text-sm font-semibold text-slate-900 mb-4 tracking-wide uppercase">Company</h4>
+          <ul className="space-y-2.5">
+            {COMPANY_LINKS.map(({ href, label }) => (
+              <li key={href}>
+                <Link href={href} className="text-slate-500 hover:text-blue-600 transition-colors">
+                  {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
 
-      {/* Bottom Bar */}
-      <div className="border-t border-gray-200 py-5 text-center text-xs text-gray-500 select-none font-light tracking-wide">
-        © {new Date().getFullYear()} AI Resume Builder. All rights reserved.
+      <div className="border-t border-slate-100 py-5 text-center text-xs text-slate-400">
+        © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
       </div>
     </footer>
   );

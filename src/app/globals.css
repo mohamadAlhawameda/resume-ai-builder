@@ -1,16 +1,8 @@
 @import "tailwindcss";
-/* globals.css or tailwind.config.js */
-.input-field {
-  @apply w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200;
-}
-.input {
-  @apply w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition;
-}
-
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 @theme inline {
@@ -20,15 +12,95 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Legacy input classes kept for backward compatibility */
+.input-field,
+.input {
+  @apply w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200;
+}
+
+/* Consistent, visible keyboard-focus everywhere */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip link for keyboard/screen-reader users */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 999;
+  padding: 0.75rem 1.25rem;
+  background: #1e293b;
+  color: #fff;
+  border-radius: 0 0 0.5rem 0;
+  font-weight: 600;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* Subtle entrance animation utility */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.45s ease-out both;
+}
+
+/* Slim scrollbars for panels */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
-body {
-  /* background: var(--background); */
-  /* color: var(--foreground); */
-  font-family: Arial, Helvetica, sans-serif;
+/* Print: only the resume preview should appear */
+@media print {
+  header,
+  footer,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
 }

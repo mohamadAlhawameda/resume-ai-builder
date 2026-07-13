@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Providers from "@/components/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,8 +18,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Resume Builder",
-  description: "Create professional resumes effortlessly with AI assistance.",
+  title: {
+    default: "ResumeAI — AI Resume Builder, Scanner & Job Matching",
+    template: "%s · ResumeAI",
+  },
+  description:
+    "Build professional resumes, scan them against ATS criteria, match them to job descriptions, and discover jobs that fit — all powered by AI.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -28,10 +38,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="antialiased">
+      <body className="antialiased flex flex-col min-h-screen">
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         <Navbar />
-        <main className="min-h-screen">{children}</main>
+        <main id="main-content" className="flex-1">
+          {children}
+        </main>
         <Footer />
+        <Providers />
       </body>
     </html>
   );

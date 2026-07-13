@@ -1,201 +1,147 @@
-import React from "react";
+import React from 'react';
+import type { SectionKey } from '@/lib/types';
+import {
+  TemplateProps,
+  getCustomization,
+  visibleSections,
+  densityScale,
+  bulletLines,
+  contactLine,
+} from './shared';
 
-type EducationItem = {
-  degree?: string;
-  school?: string;
-  from?: string;
-  to?: string;
-  achievements?: string;
-};
+/** Traditional serif resume — timeless, ATS-safe single column. */
+export default function ClassicTemplate({ data }: TemplateProps) {
+  const custom = getCustomization(data);
+  const scale = densityScale(custom.density);
+  const accent = custom.accentColor;
+  const font = "Georgia, 'Times New Roman', serif";
 
-type ExperienceItem = {
-  role?: string;
-  company?: string;
-  from?: string;
-  to?: string;
-  description?: string;
-};
+  const sectionTitle: React.CSSProperties = {
+    fontSize: '1.15rem',
+    fontWeight: 700,
+    fontFamily: font,
+    borderBottom: `1.5px solid ${accent}`,
+    paddingBottom: '0.25rem',
+    marginBottom: `${0.75 * scale}rem`,
+    color: '#111111',
+    letterSpacing: '0.02em',
+  };
+  const sectionStyle: React.CSSProperties = { marginBottom: `${1.5 * scale}rem` };
+  const body: React.CSSProperties = { fontSize: '0.875rem', lineHeight: 1.5, color: '#1f2937' };
 
-type ResumeData = {
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  linkedIn?: string;
-  github?: string;
-  isDeveloper?: boolean;
-  summary?: string;
-  education?: EducationItem[];
-  experience?: ExperienceItem[];
-  skills?: string[];
-};
+  const sections: Record<SectionKey, React.ReactNode> = {
+    summary: data.summary?.trim() ? (
+      <section style={sectionStyle} key="summary">
+        <h2 style={sectionTitle}>Professional Summary</h2>
+        <p style={{ ...body, whiteSpace: 'pre-line' }}>{data.summary}</p>
+      </section>
+    ) : null,
 
-type Props = {
-  data?: ResumeData;
-};
+    experience:
+      data.experience.length > 0 ? (
+        <section style={sectionStyle} key="experience">
+          <h2 style={sectionTitle}>Experience</h2>
+          <div>
+            {data.experience.map((exp, i) => (
+              <div key={i} style={{ marginBottom: `${1 * scale}rem` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.25rem' }}>
+                  <span style={{ ...body, fontWeight: 700 }}>
+                    {exp.role || 'Role'}, {exp.company || 'Company'}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', fontStyle: 'italic', color: '#4b5563' }}>
+                    {exp.from || 'Start'} – {exp.to || 'End'}
+                  </span>
+                </div>
+                {bulletLines(exp.description).length > 0 && (
+                  <ul style={{ paddingLeft: '1.25rem', marginTop: '0.35rem', listStyle: 'disc' }}>
+                    {bulletLines(exp.description).map((line, j) => (
+                      <li key={j} style={{ ...body, marginBottom: '0.2rem' }}>
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null,
 
-function renderBullets(text?: string) {
-  if (!text || typeof text !== "string" || text.trim().length === 0) return null;
+    education:
+      data.education.length > 0 ? (
+        <section style={sectionStyle} key="education">
+          <h2 style={sectionTitle}>Education</h2>
+          {data.education.map((edu, i) => (
+            <div key={i} style={{ marginBottom: `${0.75 * scale}rem` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.25rem' }}>
+                <span style={{ ...body, fontWeight: 700 }}>
+                  {edu.degree || 'Degree'}, {edu.school || 'School'}
+                </span>
+                <span style={{ fontSize: '0.8rem', fontStyle: 'italic', color: '#4b5563' }}>
+                  {edu.from || 'Start'} – {edu.to || 'End'}
+                </span>
+              </div>
+              {bulletLines(edu.achievements).length > 0 && (
+                <ul style={{ paddingLeft: '1.25rem', marginTop: '0.3rem', listStyle: 'disc' }}>
+                  {bulletLines(edu.achievements).map((line, j) => (
+                    <li key={j} style={{ ...body, marginBottom: '0.15rem' }}>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </section>
+      ) : null,
 
-  const lines = text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+    skills:
+      data.skills.filter(Boolean).length > 0 ? (
+        <section style={sectionStyle} key="skills">
+          <h2 style={sectionTitle}>Skills</h2>
+          <ul
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '0.25rem 1rem',
+              paddingLeft: '1.1rem',
+              listStyle: 'disc',
+              ...body,
+            }}
+          >
+            {data.skills.filter(Boolean).map((skill, i) => (
+              <li key={i}>{skill}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null,
+  };
 
   return (
-    <ul className="list-disc pl-6 mt-1 space-y-1">
-      {lines.map((line, i) => (
-        <li key={i} className="text-sm leading-snug">
-          {line}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function renderAchievements(text?: string) {
-  if (!text || typeof text !== "string" || text.trim().length === 0) return null;
-
-  const lines = text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return (
-    <ul className="list-disc pl-6 mt-2 space-y-1">
-      {lines.map((line, i) => (
-        <li key={i} className="text-sm leading-snug">
-          <span className="font-semibold">Achievements: </span>
-          {line}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export default function ClassicTemplate({ data }: Props) {
-  return (
-    <>
-      {/* Header */}
-      <header className="mb-8 border-b-2 border-black pb-2">
-        <h1 className="text-4xl font-serif font-bold">
-          {data?.fullName ?? "Your Name"}
-        </h1>
-        <p className="text-base font-serif italic mt-1">
-          {data?.email ?? "email@example.com"} | {data?.phone ?? "Phone Number"} |{" "}
-          {data?.linkedIn ? (
-            <a
-              href={data.linkedIn}
-              className="underline text-blue-700"
-              target="_blank"
-              rel="noreferrer"
-            >
-              LinkedIn
-            </a>
-          ) : (
-            "LinkedIn"
-          )}
-          {data?.isDeveloper && data?.github && (
+    <div style={{ fontFamily: font, color: '#111111' }}>
+      <header style={{ marginBottom: `${1.5 * scale}rem`, borderBottom: '2px solid #111111', paddingBottom: '0.6rem' }}>
+        <h1 style={{ fontSize: '2.1rem', fontWeight: 700, fontFamily: font }}>{data.fullName || 'Your Name'}</h1>
+        <p style={{ fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.3rem', color: '#374151' }}>
+          {contactLine(data).join(' | ')}
+          {data.linkedIn && (
             <>
-              {" "}
-              |{" "}
-              <a
-                href={data.github}
-                className="underline text-blue-700"
-                target="_blank"
-                rel="noreferrer"
-              >
+              {contactLine(data).length > 0 && ' | '}
+              <a href={data.linkedIn} style={{ color: accent, textDecoration: 'underline' }} target="_blank" rel="noreferrer">
+                LinkedIn
+              </a>
+            </>
+          )}
+          {data.isDeveloper && data.github && (
+            <>
+              {' | '}
+              <a href={data.github} style={{ color: accent, textDecoration: 'underline' }} target="_blank" rel="noreferrer">
                 GitHub
               </a>
             </>
           )}
         </p>
       </header>
-
-      {/* Summary */}
-      {data?.summary && typeof data.summary === "string" && data.summary.trim() && (
-        <section className="mb-8">
-          <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
-            Professional Summary
-          </h2>
-          <p className="whitespace-pre-line text-sm leading-relaxed">
-            {data.summary}
-          </p>
-        </section>
-      )}
-
-      {/* Education */}
-      {Array.isArray(data?.education) && data.education.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
-            Education
-          </h2>
-          <div className="space-y-6">
-            {data.education.map((edu, i) => (
-              <div key={i} className="text-sm">
-                <div className="flex justify-between font-semibold">
-                  <span>
-                    {edu.degree ?? "Degree"},{" "}
-                    {edu.school ?? "School"}
-                  </span>
-                  <span className="italic text-sm text-gray-600">
-                    {edu.from ?? "Start"} – {edu.to ?? "End"}
-                  </span>
-                </div>
-                {renderAchievements(edu.achievements)}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Experience */}
-      {Array.isArray(data?.experience) && data.experience.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
-            Experience
-          </h2>
-          <div className="space-y-6">
-            {data.experience.map((exp, i) => (
-              <div key={i} className="text-sm">
-                <div className="flex justify-between font-semibold">
-                  <span>
-                    {exp.role ?? "Role"}, {exp.company ?? "Company"}
-                  </span>
-                  <span className="italic text-sm text-gray-600">
-                    {exp.from ?? "Start"} – {exp.to ?? "End"}
-                  </span>
-                </div>
-                {renderBullets(exp.description)}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Skills */}
-      {Array.isArray(data?.skills) && data.skills.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-2xl font-serif font-semibold border-b border-black pb-1 mb-3">
-            Skills
-          </h2>
-          <ul className="grid grid-cols-3 gap-y-1 pl-4 text-sm list-disc list-inside">
-            {data.skills.map((skill, i) => (
-              <li
-                key={i}
-                className={
-                  i % 3 === 0
-                    ? "text-left"
-                    : i % 3 === 1
-                    ? "text-center"
-                    : "text-right"
-                }
-              >
-                {skill}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </>
+      {visibleSections(data).map((key) => sections[key])}
+    </div>
   );
 }

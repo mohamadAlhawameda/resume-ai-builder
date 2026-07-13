@@ -1,138 +1,52 @@
-// "use client";
+'use client';
 
-// import React from "react";
-// import ModernTemplate from "@/components/resumeTemplates/ModernTemplate";
-// import ClassicTemplate from "@/components/resumeTemplates/ClassicTemplate";
-// import MinimalTemplate from "@/components/resumeTemplates/MinimalTemplate";
-
-// interface ResumePreviewProps {
-//   data: {
-//     fullName: string;
-//     email: string;
-//     phone: string;
-//     linkedIn: string;
-//     github: string;
-//     isDeveloper: boolean;
-//     summary: string;
-//     education: {
-//       school: string;
-//       degree: string;
-//       from: string;
-//       to: string;
-//     }[];
-//     experience: {
-//       company: string;
-//       role: string;
-//       from: string;
-//       to: string;
-//       description: string;
-//     }[];
-//     skills: string[];
-//   };
-//   template: "modern" | "classic" | "minimal";
-// }
-
-// export default function ResumePreview({ data, template }: ResumePreviewProps) {
-//   const renderTemplate = () => {
-//     switch (template) {
-//       case "modern":
-//         return <ModernTemplate data={data} />;
-//       case "classic":
-//         return <ClassicTemplate data={data} />;
-//       case "minimal":
-//         return <MinimalTemplate data={data} />;
-//       default:
-//         return (
-//           <div className="text-center py-8 text-red-500 font-medium">
-//             Unknown template: {template}
-//           </div>
-//         );
-//     }
-//   };
-
-//   return (
-//    <div
-//   style={{
-//     backgroundColor: "#fff",
-//     border: "1px solid #e5e7eb", // same as Tailwind border-gray-200
-//     borderRadius: "1rem",         // same as rounded-xl
-//     boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)", // approximate shadow-md
-//     padding: "1.5rem",
-//   }}
-//   className="overflow-hidden mx-auto max-w-[900px] w-full print:shadow-none print:border-none print:p-0"
-// >
-//   {renderTemplate()}
-// </div>
-
-//   );
-// }
-"use client";
-
-import React from "react";
-import ModernTemplate from "@/components/resumeTemplates/ModernTemplate";
-import ClassicTemplate from "@/components/resumeTemplates/ClassicTemplate";
-import MinimalTemplate from "@/components/resumeTemplates/MinimalTemplate";
+import React from 'react';
+import ModernTemplate from '@/components/resumeTemplates/ModernTemplate';
+import ClassicTemplate from '@/components/resumeTemplates/ClassicTemplate';
+import MinimalTemplate from '@/components/resumeTemplates/MinimalTemplate';
+import ExecutiveTemplate from '@/components/resumeTemplates/ExecutiveTemplate';
+import CreativeTemplate from '@/components/resumeTemplates/CreativeTemplate';
+import type { ResumeData, TemplateId } from '@/lib/types';
 
 interface ResumePreviewProps {
-  data: {
-    fullName: string;
-    email: string;
-    phone: string;
-    linkedIn: string;
-    github: string;
-    isDeveloper: boolean;
-    summary: string;
-    education: {
-      school: string;
-      degree: string;
-      from: string;
-      to: string;
-    }[];
-    experience: {
-      company: string;
-      role: string;
-      from: string;
-      to: string;
-      description: string;
-    }[];
-    skills: string[];
-  };
-  template: "modern" | "classic" | "minimal";
+  data: ResumeData;
+  template: TemplateId | string;
 }
 
+const TEMPLATES: Record<TemplateId, React.ComponentType<{ data: ResumeData }>> = {
+  modern: ModernTemplate,
+  classic: ClassicTemplate,
+  minimal: MinimalTemplate,
+  executive: ExecutiveTemplate,
+  creative: CreativeTemplate,
+};
+
+/**
+ * A4 canvas wrapper for all templates.
+ * Uses inline hex colors only — html2canvas (PDF export) can't parse the
+ * oklch() colors Tailwind v4 emits.
+ */
 export default function ResumePreview({ data, template }: ResumePreviewProps) {
-  const renderTemplate = () => {
-    switch (template) {
-      case "modern":
-        return <ModernTemplate data={data} />;
-      case "classic":
-        return <ClassicTemplate data={data} />;
-      case "minimal":
-        return <MinimalTemplate data={data} />;
-      default:
-        return (
-          <div style={{ textAlign: "center", padding: "2rem", color: "red", fontWeight: "500" }}>
-            Unknown template: {template}
-          </div>
-        );
-    }
-  };
+  const key = (template === 'default' ? 'classic' : template) as TemplateId;
+  const Template = TEMPLATES[key] || ClassicTemplate;
+  // Executive/Creative paint their own edge-to-edge headers.
+  const framed = key !== 'executive' && key !== 'creative';
 
   return (
     <div
       style={{
-        backgroundColor: "#ffffff", // white background
-        color: "#000000", // black text
-        width: "210mm", // A4 width
-        minHeight: "297mm", // A4 height
-        margin: "0 auto",
-        boxSizing: "border-box",
-        padding: "2rem", // visible only in browser
-        overflow: "hidden",
+        backgroundColor: '#ffffff',
+        color: '#000000',
+        width: '210mm',
+        minHeight: '297mm',
+        margin: '0 auto',
+        boxSizing: 'border-box',
+        padding: framed ? '2rem' : 0,
+        overflow: 'hidden',
       }}
       className="print:p-0 print:m-0 print:shadow-none print:border-none print:rounded-none print:bg-white"
     >
-      {renderTemplate()}
+      <Template data={data} />
     </div>
   );
 }
