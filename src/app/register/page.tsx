@@ -1,11 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { Eye, EyeOff, UserPlus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import Button from '@/components/ui/Button';
+import { api, apiErrorMessage } from '@/lib/api';
+import { storeSession, type StoredUser } from '@/lib/auth';
 
 const schema = z
   .object({
@@ -21,8 +26,9 @@ const schema = z
 
 type FormData = z.infer<typeof schema>;
 
-export default function AdvancedRegisterPage() {
+function RegisterContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -49,154 +55,133 @@ export default function AdvancedRegisterPage() {
     setPasswordStrength('Medium');
   }, [watchedPassword]);
 
- const onSubmit = async (data: FormData) => {
-  setLoading(true);
-  setError(null);
+  const onSubmit = async (data: FormData) => {
+    setLoading(true);
+    setError(null);
 
-  try {
-    const res = await fetch('https://resume-ai-builder-esnw.onrender.com/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),
-    });
+    try {
+      const result = await api<{ token: string; user: StoredUser }>('/auth/register', {
+        method: 'POST',
+        auth: false,
+        body: { name: data.name, email: data.email, password: data.password },
+      });
 
-    const result = await res.json();
-
-    if (!res.ok) {
-      setError(result.message || 'Registration failed');
-      return;
-    }
-
-    const { token, user } = result;
-
-    if (!token || !user) {
-      setError("Invalid response from server. Please try again.");
-      return;
-    }
-
-    // Store auth
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
-
-    // Check if redirected for resume saving
-    const redirectUrl = new URL(window.location.href);
-    const redirectAction = redirectUrl.searchParams.get("redirect");
-
-    if (redirectAction === "saveResume") {
-      const resumeDataToSave = localStorage.getItem("resumeDataToSave");
-
-      if (resumeDataToSave) {
-        try {
-          const saveResponse = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ data: JSON.parse(resumeDataToSave) }),
-          });
-
-          if (!saveResponse.ok) {
-            console.error("Auto-save resume failed:", await saveResponse.text());
-            alert("Account created but auto-saving resume failed.");
-          } else {
-            alert("Account created and resume saved!");
-          }
-
-          localStorage.removeItem("resumeDataToSave");
-        } catch (err) {
-          console.error("Resume auto-save error:", err);
-        }
+      if (!result?.token || !result?.user) {
+        setError('Invalid response from server. Please try again.');
+        return;
       }
 
-      router.push("/dashboard");
-      return;
+      storeSession(result.token, result.user, true);
+
+      // Guest built a resume, then registered to save it
+      if (searchParams.get('redirect') === 'saveResume') {
+        const resumeDataToSave = localStorage.getItem('resumeDataToSave');
+        if (resumeDataToSave) {
+          try {
+            await api('/resume/create', {
+              method: 'POST',
+              body: { data: JSON.parse(resumeDataToSave) },
+            });
+            localStorage.removeItem('resumeDataToSave');
+          } catch (err) {
+            console.error('Resume auto-save error:', err);
+          }
+        }
+        router.push('/dashboard');
+        return;
+      }
+
+      router.push('/resume');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Registration failed'));
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Normal flow if not resume save
-    router.push("/resume");
-
-  } catch (err) {
-    console.error("Registration error:", err);
-    setError("Unexpected server error, please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  const inputClass = (hasError: boolean) =>
+    `w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition ${
+      hasError ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
+    }`;
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-r from-indigo-100 via-sky-100 to-emerald-100 px-4">
-      <form
+    <main className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-emerald-50 px-4 py-12">
+      <motion.form
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
         onSubmit={handleSubmit(onSubmit)}
-        className="w-full max-w-lg bg-white p-10 rounded-2xl shadow-2xl border"
+        className="w-full max-w-lg bg-white p-8 sm:p-10 rounded-3xl shadow-xl shadow-blue-100/60 border border-slate-100"
         noValidate
       >
-        <h1 className="text-3xl font-extrabold text-center text-indigo-600 mb-8">Create an Account</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-center text-slate-900 mb-2">Create your account</h1>
+        <p className="text-sm text-slate-500 text-center mb-8">
+          Free forever — build, scan, and match your resume to jobs.
+        </p>
 
-        {[
-          { id: 'name', label: 'Full Name', type: 'text' },
-          { id: 'email', label: 'Email Address', type: 'email' },
-        ].map(({ id, label, type }) => (
+        {(
+          [
+            { id: 'name', label: 'Full Name', type: 'text', autoComplete: 'name' },
+            { id: 'email', label: 'Email Address', type: 'email', autoComplete: 'email' },
+          ] as const
+        ).map(({ id, label, type, autoComplete }) => (
           <div key={id} className="mb-4">
-            <label htmlFor={id} className="block font-medium text-gray-700 mb-1">
+            <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">
               {label}
             </label>
             <input
               id={id}
               type={type}
-              {...register(id as keyof FormData)}
-              className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 text-sm ${
-                errors[id as keyof FormData]
-                  ? 'border-red-500 focus:ring-red-400'
-                  : 'border-gray-300 focus:ring-indigo-500'
-              }`}
-              aria-invalid={errors[id as keyof FormData] ? 'true' : 'false'}
+              autoComplete={autoComplete}
+              {...register(id)}
+              className={inputClass(!!errors[id])}
+              aria-invalid={errors[id] ? 'true' : 'false'}
               aria-describedby={`${id}-error`}
             />
-            {errors[id as keyof FormData] && (
-              <p id={`${id}-error`} className="text-red-600 text-xs mt-1">
-                {errors[id as keyof FormData]?.message}
+            {errors[id] && (
+              <p id={`${id}-error`} className="text-red-600 text-xs mt-1.5">
+                {errors[id]?.message}
               </p>
             )}
           </div>
         ))}
 
-        {/* Password field */}
-        <div className="mb-4 relative">
-          <label htmlFor="password" className="block font-medium text-gray-700 mb-1">
+        <div className="mb-4">
+          <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
             Password
           </label>
-          <input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            {...register('password')}
-            className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 text-sm ${
-              errors.password ? 'border-red-500 focus:ring-red-400' : 'border-gray-300 focus:ring-indigo-500'
-            }`}
-            aria-invalid={errors.password ? 'true' : 'false'}
-            aria-describedby="password-error password-strength"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute top-8 right-3 text-gray-500 hover:text-indigo-600"
-          >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              {...register('password')}
+              className={`${inputClass(!!errors.password)} pr-11`}
+              aria-invalid={errors.password ? 'true' : 'false'}
+              aria-describedby="password-error password-strength"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
           {errors.password && (
-            <p id="password-error" className="text-red-600 text-xs mt-1">
+            <p id="password-error" className="text-red-600 text-xs mt-1.5">
               {errors.password.message}
             </p>
           )}
           {passwordStrength && (
             <p
               id="password-strength"
-              className={`text-xs mt-1 font-medium ${
+              className={`text-xs mt-1.5 font-medium ${
                 passwordStrength === 'Strong'
-                  ? 'text-green-600'
+                  ? 'text-emerald-600'
                   : passwordStrength === 'Medium'
-                  ? 'text-yellow-600'
+                  ? 'text-amber-600'
                   : 'text-red-600'
               }`}
             >
@@ -205,68 +190,61 @@ export default function AdvancedRegisterPage() {
           )}
         </div>
 
-        {/* Confirm Password field */}
-        <div className="mb-6 relative">
-          <label htmlFor="confirmPassword" className="block font-medium text-gray-700 mb-1">
+        <div className="mb-6">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-1.5">
             Confirm Password
           </label>
-          <input
-            id="confirmPassword"
-            type={showConfirmPassword ? 'text' : 'password'}
-            {...register('confirmPassword')}
-            className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 text-sm ${
-              errors.confirmPassword ? 'border-red-500 focus:ring-red-400' : 'border-gray-300 focus:ring-indigo-500'
-            }`}
-            aria-invalid={errors.confirmPassword ? 'true' : 'false'}
-            aria-describedby="confirmPassword-error"
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword((v) => !v)}
-            className="absolute top-8 right-3 text-gray-500 hover:text-indigo-600"
-          >
-            {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
+          <div className="relative">
+            <input
+              id="confirmPassword"
+              type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              {...register('confirmPassword')}
+              className={`${inputClass(!!errors.confirmPassword)} pr-11`}
+              aria-invalid={errors.confirmPassword ? 'true' : 'false'}
+              aria-describedby="confirmPassword-error"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+            >
+              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
           {errors.confirmPassword && (
-            <p id="confirmPassword-error" className="text-red-600 text-xs mt-1">
+            <p id="confirmPassword-error" className="text-red-600 text-xs mt-1.5">
               {errors.confirmPassword.message}
             </p>
           )}
         </div>
 
-        {error && <p className="text-sm text-red-600 text-center mb-4">{error}</p>}
+        {error && (
+          <div role="alert" className="text-sm text-red-700 text-center mb-4 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+            {error}
+          </div>
+        )}
 
-        <button
-          type="submit"
-          disabled={!isValid || loading}
-          className="w-full py-2 rounded-lg bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition disabled:opacity-50 flex justify-center items-center"
-        >
-          {loading ? (
-            <svg
-              className="animate-spin h-5 w-5 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v8z"
-              />
-            </svg>
-          ) : (
-            'Register'
-          )}
-        </button>
+        <Button type="submit" fullWidth size="lg" loading={loading} disabled={!isValid} icon={<UserPlus className="w-4 h-4" />}>
+          {loading ? 'Creating account…' : 'Create account'}
+        </Button>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <p className="mt-6 text-center text-sm text-slate-500">
           Already have an account?{' '}
-          <a href="/login" className="text-indigo-600 font-medium hover:underline">
+          <Link href="/login" className="text-blue-600 font-medium hover:underline">
             Log in here
-          </a>
+          </Link>
         </p>
-      </form>
+      </motion.form>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterContent />
+    </Suspense>
   );
 }

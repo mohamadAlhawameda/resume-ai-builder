@@ -1,11 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
+import { motion } from 'framer-motion';
+import Button from '@/components/ui/Button';
+import { api, apiErrorMessage } from '@/lib/api';
+import { storeSession, type StoredUser } from '@/lib/auth';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -15,8 +20,9 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,106 +36,73 @@ export default function LoginPage() {
     resolver: zodResolver(schema),
   });
 
-const onSubmit = async (data: FormData) => {
-  setLoading(true);
-  setError(null);
+  const onSubmit = async (data: FormData) => {
+    setLoading(true);
+    setError(null);
 
-  try {
-    const response = await fetch("https://resume-ai-builder-esnw.onrender.com/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: data.email,
-        password: data.password,
-      }),
-    });
+    try {
+      const result = await api<{ token: string; user: StoredUser }>('/auth/login', {
+        method: 'POST',
+        auth: false,
+        body: { email: data.email, password: data.password },
+      });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      setError(result?.message || "Login failed. Please check your credentials.");
-      return;
-    }
-
-    const token = result?.token;
-    const user = result?.user;
-
-    if (!token || !user) {
-      setError("Invalid response from server. Please try again later.");
-      return;
-    }
-
-  if (data.rememberMe) {
-  localStorage.setItem("token", token);
-  localStorage.setItem("user", JSON.stringify(user));
-} else {
-  sessionStorage.setItem("token", token);
-  sessionStorage.setItem("user", JSON.stringify(user));
-}
-
-// ✅ Trigger navbar update
-window.dispatchEvent(new Event("authChanged"));
-
-
-    // Check if redirected for saving a resume
-    const redirectUrl = new URL(window.location.href);
-    const redirectAction = redirectUrl.searchParams.get("redirect");
-
-    if (redirectAction === "saveResume") {
-      const resumeDataToSave = localStorage.getItem("resumeDataToSave");
-
-      if (resumeDataToSave) {
-        const parsedData = JSON.parse(resumeDataToSave);
-        try {
-          const saveResponse = await fetch("https://resume-ai-builder-esnw.onrender.com/resume/create", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ data: parsedData }),
-          });
-
-          if (!saveResponse.ok) {
-            const errorText = await saveResponse.text();
-            console.error("Failed to auto-save resume after login:", errorText);
-            alert("Logged in successfully, but auto-saving resume failed.");
-          } else {
-            alert("Logged in and resume saved successfully!");
-          }
-
-          localStorage.removeItem("resumeDataToSave");
-        } catch (saveErr) {
-          console.error("Resume save error after login:", saveErr);
-        }
+      if (!result?.token || !result?.user) {
+        setError('Invalid response from server. Please try again later.');
+        return;
       }
 
-      router.push("/dashboard");
-      return;
+      storeSession(result.token, result.user, !!data.rememberMe);
+
+      const redirectAction = searchParams.get('redirect');
+
+      // Guest built a resume, then logged in to save it
+      if (redirectAction === 'saveResume') {
+        const resumeDataToSave = localStorage.getItem('resumeDataToSave');
+        if (resumeDataToSave) {
+          try {
+            await api('/resume/create', {
+              method: 'POST',
+              body: { data: JSON.parse(resumeDataToSave) },
+            });
+            localStorage.removeItem('resumeDataToSave');
+          } catch (saveErr) {
+            console.error('Resume save error after login:', saveErr);
+          }
+        }
+        router.push('/dashboard');
+        return;
+      }
+
+      // Path-style redirect (e.g. /login?redirect=/analyze)
+      if (redirectAction && redirectAction.startsWith('/')) {
+        router.push(redirectAction);
+        return;
+      }
+
+      router.push('/dashboard');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Login failed. Please check your credentials.'));
+    } finally {
+      setLoading(false);
     }
-
-    // Normal login
-    router.push("/dashboard");
-  } catch (err) {
-    console.error("Login error:", err);
-    setError("Unexpected server error. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-r from-purple-200 via-indigo-200 to-blue-200 px-4">
-      <form
+    <main className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-12">
+      <motion.form
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
         onSubmit={handleSubmit(onSubmit)}
-        className="w-full max-w-md bg-white shadow-xl p-10 rounded-3xl border border-indigo-100 animate-fade-in"
+        className="w-full max-w-md bg-white shadow-xl shadow-blue-100/60 p-8 sm:p-10 rounded-3xl border border-slate-100"
         noValidate
       >
-        <h2 className="text-4xl font-bold text-center mb-6 text-indigo-800 drop-shadow">Welcome Back</h2>
+        <h1 className="text-2xl sm:text-3xl font-bold text-center mb-2 text-slate-900">Welcome back</h1>
+        <p className="text-sm text-slate-500 text-center mb-8">Log in to your resumes, scans, and job matches.</p>
 
-        <div className="relative mb-6">
-          <label className="block text-sm font-semibold text-gray-700 mb-2" htmlFor="email">
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="email">
             Email
           </label>
           <input
@@ -137,16 +110,16 @@ window.dispatchEvent(new Event("authChanged"));
             id="email"
             autoComplete="email"
             {...register('email')}
-            className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 shadow-sm ${
-              errors.email ? 'border-red-500 focus:ring-red-400' : 'border-gray-300 focus:ring-indigo-500'
+            className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
+              errors.email ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
             }`}
             aria-invalid={errors.email ? 'true' : 'false'}
           />
-          {errors.email && <p className="text-red-600 text-sm mt-1 font-medium">{errors.email.message}</p>}
+          {errors.email && <p className="text-red-600 text-xs mt-1.5 font-medium">{errors.email.message}</p>}
         </div>
 
-        <div className="relative mb-6">
-          <label className="block text-sm font-semibold text-gray-700 mb-2" htmlFor="password">
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="password">
             Password
           </label>
           <div className="relative">
@@ -155,82 +128,59 @@ window.dispatchEvent(new Event("authChanged"));
               id="password"
               autoComplete="current-password"
               {...register('password')}
-              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 shadow-sm ${
-                errors.password ? 'border-red-500 focus:ring-red-400' : 'border-gray-300 focus:ring-indigo-500'
+              className={`w-full px-4 py-3 pr-11 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
+                errors.password ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
               }`}
               aria-invalid={errors.password ? 'true' : 'false'}
             />
             <button
               type="button"
-              className="absolute right-3 top-3 text-gray-500 hover:text-indigo-700"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition"
               onClick={() => setShowPassword((v) => !v)}
-              title={showPassword ? 'Hide Password' : 'Show Password'}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-          {errors.password && <p className="text-red-600 text-sm mt-1 font-medium">{errors.password.message}</p>}
+          {errors.password && <p className="text-red-600 text-xs mt-1.5 font-medium">{errors.password.message}</p>}
         </div>
 
         <div className="flex items-center justify-between mb-6">
-          <label className="flex items-center text-sm text-gray-700">
+          <label className="flex items-center text-sm text-slate-600 cursor-pointer">
             <input
               type="checkbox"
               {...register('rememberMe')}
-              className="form-checkbox text-indigo-600 rounded mr-2"
+              className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 mr-2"
             />
             Remember me
           </label>
-          <a href="#" className="text-sm text-indigo-600 hover:underline">
-            Forgot Password?
-          </a>
         </div>
 
         {error && (
-          <div className="text-red-600 text-sm text-center font-semibold mb-4">{error}</div>
+          <div role="alert" className="text-red-700 text-sm text-center font-medium mb-4 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+            {error}
+          </div>
         )}
 
-        <button
-          type="submit"
-          disabled={!isValid || loading}
-          className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold shadow hover:bg-indigo-700 transition-all duration-200 disabled:opacity-50"
-        >
-          {loading ? (
-            <div className="flex justify-center items-center space-x-2">
-              <svg
-                className="animate-spin h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8z"
-                ></path>
-              </svg>
-              <span>Logging in...</span>
-            </div>
-          ) : (
-            'Log In'
-          )}
-        </button>
+        <Button type="submit" fullWidth size="lg" loading={loading} disabled={!isValid} icon={<LogIn className="w-4 h-4" />}>
+          {loading ? 'Logging in…' : 'Log in'}
+        </Button>
 
-        <p className="mt-6 text-center text-gray-600 text-sm">
+        <p className="mt-6 text-center text-slate-500 text-sm">
           Don&apos;t have an account?{' '}
-          <a href="/register" className="text-indigo-600 font-semibold hover:underline">
+          <Link href="/register" className="text-blue-600 font-semibold hover:underline">
             Register here
-          </a>
+          </Link>
         </p>
-      </form>
+      </motion.form>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

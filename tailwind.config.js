@@ -1,26 +1,7 @@
-// module.exports = {
-//   theme: {
-//     extend: {},
-//   },
-//   future: {
-//     // Disable OKLCH colors if enabled
-//     disableColorOpacityUtilitiesByDefault: false,
-//   },
-//   // Force use of RGB values
-//   experimental: {
-//         disableColorPalette: true, // 👈 THIS is the key line!
-
-//     optimizeUniversalDefaults: true,
-//   },
-// }
-// tailwind.config.js
+// Tailwind v4 is configured via CSS (@import "tailwindcss" in globals.css).
+// This file is kept only for editor tooling that still looks for it.
 module.exports = {
   theme: {
     extend: {},
   },
-  experimental: {
-    disableColorPalette: true, // ✅ disables oklch() entirely
-    optimizeUniversalDefaults: true,
-  },
 };
-

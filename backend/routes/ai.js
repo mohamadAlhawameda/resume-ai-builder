@@ -1,73 +1,68 @@
+// Legacy suggestion endpoints — kept for backward compatibility with older
+// frontend builds. New clients should use /generate (structured, no raw
+// prompts). These are hardened: input length caps, rate limiting, and a
+// resume-writing system prompt instead of a generic assistant.
 
 import express from 'express';
-import OpenAI from 'openai';
+import Joi from 'joi';
+import rateLimit from 'express-rate-limit';
 import authMiddleware from '../middleware/authMiddleware.js';
+import { aiAvailable, chatText, truncate } from '../services/ai.js';
+import { validateBody } from '../utils/validate.js';
 
 const router = express.Router();
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const promptSchema = Joi.object({
+  prompt: Joi.string().min(3).max(6000).required(),
+  type: Joi.string().allow('').max(40).optional(),
 });
 
-// Public route — summary suggestions, no auth required
-router.post('/suggest/summary', async (req, res) => {
-  const { prompt } = req.body;
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // unauthenticated — keep tight
+  message: { message: 'Too many AI requests. Please try again later or sign in.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-  if (!prompt) return res.status(400).json({ message: 'Prompt is required' });
+const SYSTEM =
+  'You are a professional resume-writing assistant. Only help with resume, cover letter, and career-related writing. If asked anything unrelated, reply exactly: "I can only help with resume writing." Keep answers concise.';
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: 100,
+async function suggest(req, res) {
+  if (!aiAvailable()) {
+    return res.json({
+      suggestions: ['AI suggestions are not configured on this server. Add OPENAI_API_KEY to enable them.'],
     });
-
-    const suggestions = completion.choices[0].message.content
-      .split('\n')
-      .filter(Boolean);
-
+  }
+  try {
+    const content = await chatText({
+      system: SYSTEM,
+      user: truncate(req.body.prompt, 4000),
+      maxTokens: 300,
+    });
+    const suggestions = content.split('\n').filter(Boolean);
     res.json({ suggestions });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'OpenAI API error' });
+    res.status(500).json({ message: 'AI service error' });
   }
-});
+}
 
-// Protect all routes below — user must be logged in
+// Public route — summary suggestions for guests, tightly rate-limited
+router.post('/suggest/summary', publicLimiter, validateBody(promptSchema), suggest);
+
+// Protected routes below
 router.use(authMiddleware);
 
-// Protected route — experience and skills suggestions require auth
-router.post('/suggest',async (req, res) => {
-  const { prompt } = req.body;
-  // const user = req.user; // Ensure user is authenticated
-  // if (!user) {
-  //   return res.status(401).json({ message: 'Unauthorized' });
-  // }
-
-  if (!prompt) return res.status(400).json({ message: 'Prompt is required' });
-
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: 100,
-    });
-
-    const suggestions = completion.choices[0].message.content
-      .split('\n')
-      .filter(Boolean);
-
-    res.json({ suggestions });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'OpenAI API error' });
-  }
+const authedLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => req.user?.userId || req.ip,
+  message: { message: 'AI request limit reached — please wait a few minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+
+router.post('/suggest', authedLimiter, validateBody(promptSchema), suggest);
 
 export default router;
