@@ -19,12 +19,13 @@ const COMPANY_LINKS = [
 
 export default function Footer() {
   return (
-    <footer className="bg-white border-t border-slate-200 text-slate-700">
+    <footer className="bg-white text-slate-700">
+      <div className="h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" aria-hidden />
       <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 text-sm">
         {/* Brand */}
         <div className="sm:col-span-2">
           <Link href="/" className="flex items-center gap-2 text-xl font-bold text-slate-900 mb-4">
-            <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-sm shadow-blue-600/30">
               <FileText className="w-4 h-4" aria-hidden />
             </span>
             {APP_NAME_PRIMARY}
@@ -35,7 +36,7 @@ export default function Footer() {
             actually match your experience — powered by AI.
           </p>
 
-          <div className="flex space-x-5 mt-6">
+          <div className="flex items-center gap-1 -ml-2 mt-6">
             {[
               { href: 'mailto:alhawameda4@gmail.com', label: 'Email', icon: Mail },
               { href: 'https://github.com/mohamadAlhawameda', label: 'GitHub', icon: Github },
@@ -47,7 +48,7 @@ export default function Footer() {
                 aria-label={label}
                 target={href.startsWith('http') ? '_blank' : undefined}
                 rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className="text-slate-400 hover:text-blue-600 transition-colors duration-200"
+                className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors duration-200"
               >
                 <Icon className="w-5 h-5" />
               </a>

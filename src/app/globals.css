@@ -52,6 +52,20 @@ textarea:focus-visible {
   left: 0;
 }
 
+/* Reusable gradient text treatment for marketing headlines */
+.gradient-text {
+  background: linear-gradient(90deg, #2563eb, #4f46e5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Faint dot-grid texture for hero/marketing section backgrounds */
+.bg-dot-grid {
+  background-image: radial-gradient(circle, rgba(37, 99, 235, 0.14) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
 /* Subtle entrance animation utility */
 @keyframes fade-up {
   from {

@@ -99,13 +99,17 @@ function LoginContent() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-12">
+    <main className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-12">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl" />
+      </div>
       <motion.form
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         onSubmit={handleSubmit(onSubmit)}
-        className="w-full max-w-md bg-white shadow-xl shadow-blue-100/60 p-8 sm:p-10 rounded-3xl border border-slate-100"
+        className="relative w-full max-w-md bg-white/95 backdrop-blur-sm shadow-[0_30px_80px_-20px_rgba(37,99,235,0.25)] ring-1 ring-slate-900/5 p-8 sm:p-10 rounded-3xl border border-slate-100"
         noValidate
       >
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-2 text-slate-900">Welcome back</h1>

@@ -106,7 +106,7 @@ export default function Navbar() {
           href="/"
           className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900 hover:opacity-80 transition shrink-0"
         >
-          <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-sm shadow-blue-600/30">
             <FileText className="w-4.5 h-4.5" aria-hidden />
           </span>
           <span>
@@ -125,7 +125,7 @@ export default function Navbar() {
               className={clsx(
                 'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition',
                 isActive(href)
-                  ? 'bg-blue-50 text-blue-700'
+                  ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               )}
             >
@@ -219,7 +219,7 @@ export default function Navbar() {
                   aria-haspopup="menu"
                   aria-expanded={userMenuOpen}
                 >
-                  <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                  <span className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-xs font-bold flex items-center justify-center shadow-sm shadow-blue-600/30">
                     {user?.name?.[0]?.toUpperCase() || 'U'}
                   </span>
                   <ChevronDown className="w-4 h-4 text-slate-400" aria-hidden />
@@ -264,7 +264,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/register"
-                  className="text-sm px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition"
+                  className="text-sm px-4 py-2 bg-gradient-to-b from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
                 >
                   Get started
                 </Link>
@@ -304,7 +304,9 @@ export default function Navbar() {
                   aria-current={isActive(href) ? 'page' : undefined}
                   className={clsx(
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
-                    isActive(href) ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-100'
+                    isActive(href)
+                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
+                      : 'text-slate-700 hover:bg-slate-100'
                   )}
                 >
                   <Icon className="w-5 h-5" aria-hidden />
@@ -335,7 +337,7 @@ export default function Navbar() {
                     <Link
                       href="/register"
                       onClick={() => setIsOpen(false)}
-                      className="text-center text-sm px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition"
+                      className="text-center text-sm px-4 py-2.5 bg-gradient-to-b from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
                     >
                       Get started
                     </Link>

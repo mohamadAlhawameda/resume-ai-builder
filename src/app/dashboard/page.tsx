@@ -103,7 +103,7 @@ export default function DashboardPage() {
       value: resumes.length,
       icon: FileText,
       href: '/resumes',
-      color: 'text-blue-600 bg-blue-50',
+      color: 'from-blue-500 to-indigo-600 shadow-blue-600/25',
     },
     {
       label: 'Latest score',
@@ -111,21 +111,21 @@ export default function DashboardPage() {
       sub: scoreDelta !== null ? `${scoreDelta >= 0 ? '+' : ''}${scoreDelta} vs previous` : undefined,
       icon: ScanSearch,
       href: '/analyze',
-      color: 'text-purple-600 bg-purple-50',
+      color: 'from-violet-500 to-purple-600 shadow-purple-600/25',
     },
     {
       label: 'Saved jobs',
       value: savedJobs.length,
       icon: Briefcase,
       href: '/jobs?tab=saved',
-      color: 'text-emerald-600 bg-emerald-50',
+      color: 'from-emerald-500 to-teal-600 shadow-emerald-600/25',
     },
     {
       label: 'Applications',
       value: applications,
       icon: ClipboardList,
       href: '/jobs?tab=saved',
-      color: 'text-amber-600 bg-amber-50',
+      color: 'from-amber-500 to-orange-600 shadow-amber-600/25',
     },
   ];
 
@@ -204,7 +204,7 @@ export default function DashboardPage() {
           >
             <Link href={s.href} className="block group">
               <Card hover className="h-full">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br text-white shadow-md ${s.color}`}>
                   <s.icon className="w-5 h-5" aria-hidden />
                 </div>
                 <p className="text-2xl font-bold text-slate-900">{s.value}</p>
