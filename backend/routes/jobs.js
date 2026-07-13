@@ -61,7 +61,7 @@ async function generateAlerts(user, scoredJobs) {
   }
 }
 
-// GET /jobs/recommended?resumeId=...
+// GET /jobs/recommended?resumeId=...&limit=...
 router.get('/recommended', async (req, res) => {
   try {
     const { user, resumeData, resumeId } = await getContext(req.user.userId, req.query.resumeId);
@@ -76,8 +76,13 @@ router.get('/recommended', async (req, res) => {
 
     await generateAlerts(user, scored).catch((e) => console.warn('Alert generation failed:', e.message));
 
+    // Live feeds can return thousands of postings; send only the best matches
+    // to keep the payload sane (descriptions alone are up to 6 KB each).
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 150, 1), 300);
+
     res.json({
-      jobs: scored,
+      jobs: scored.slice(0, limit),
+      totalMatched: scored.length,
       resumeId,
       sampleData: usingSampleData(),
       preferences: prefs,

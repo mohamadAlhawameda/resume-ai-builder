@@ -61,6 +61,7 @@ function JobsContent() {
   const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'recommended');
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [totalMatched, setTotalMatched] = useState(0);
   const [sampleData, setSampleData] = useState(false);
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
@@ -77,13 +78,14 @@ function JobsContent() {
 
   const load = useCallback(async () => {
     const [recRes, savedRes] = await Promise.allSettled([
-      api<{ jobs: Job[]; sampleData: boolean; resumeId: string | null; preferences: Partial<JobPreferences> }>(
+      api<{ jobs: Job[]; totalMatched?: number; sampleData: boolean; resumeId: string | null; preferences: Partial<JobPreferences> }>(
         '/jobs/recommended'
       ),
       api<SavedJob[]>('/jobs/saved'),
     ]);
     if (recRes.status === 'fulfilled') {
       setJobs(recRes.value.jobs || []);
+      setTotalMatched(recRes.value.totalMatched ?? (recRes.value.jobs || []).length);
       setSampleData(!!recRes.value.sampleData);
       setResumeId(recRes.value.resumeId);
       setPrefs({ ...DEFAULT_JOB_PREFERENCES, ...(recRes.value.preferences || {}) });
@@ -310,6 +312,12 @@ function JobsContent() {
                   </div>
                 </div>
               </Card>
+
+              {totalMatched > jobs.length && (
+                <p className="text-xs text-slate-500 px-1">
+                  Showing your top {jobs.length} matches from {totalMatched.toLocaleString()} live postings.
+                </p>
+              )}
 
               {filteredJobs.length === 0 ? (
                 <Card>

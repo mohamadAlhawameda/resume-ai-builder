@@ -5,6 +5,7 @@
 // company's careers page URL). This is a legitimate public API — not scraping.
 
 import { findSkillsInText } from '../../utils/text.js';
+import { prettyCompanyName } from './companyName.js';
 
 function stripHtml(html = '') {
   return html
@@ -48,7 +49,7 @@ const greenhouseProvider = {
             provider: 'greenhouse',
             externalId: String(job.id),
             title: job.title || 'Untitled role',
-            company: board,
+            company: prettyCompanyName(board),
             location: job.location?.name || 'Not specified',
             remote: /remote/i.test(job.location?.name || '') ? 'remote' : 'unknown',
             workType: 'full-time',

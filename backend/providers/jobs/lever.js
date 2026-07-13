@@ -5,6 +5,7 @@
 // jobs.lever.co URL). This is a legitimate public API — not scraping.
 
 import { findSkillsInText } from '../../utils/text.js';
+import { prettyCompanyName } from './companyName.js';
 
 function toPlainText(posting) {
   const parts = [posting.descriptionPlain || ''];
@@ -47,7 +48,7 @@ const leverProvider = {
             provider: 'lever',
             externalId: p.id,
             title: p.text || 'Untitled role',
-            company,
+            company: prettyCompanyName(company),
             location: p.categories?.location || 'Not specified',
             remote: workStyle === 'remote' ? 'remote' : workStyle === 'hybrid' ? 'hybrid' : workStyle === 'on-site' ? 'onsite' : 'unknown',
             workType: (p.categories?.commitment || 'full-time').toLowerCase(),
