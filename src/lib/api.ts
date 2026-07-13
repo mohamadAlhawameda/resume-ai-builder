@@ -66,6 +66,43 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   return data as T;
 }
 
+/**
+ * Multipart upload variant of `api` — used for resume file imports. Lets the
+ * browser set the multipart boundary (no explicit Content-Type).
+ */
+export async function apiUpload<T = unknown>(path: string, file: File, fieldName = 'file'): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const form = new FormData();
+  form.append(fieldName, file);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: form });
+  } catch {
+    throw new ApiError('Network error — please check your connection and try again.', 0);
+  }
+
+  const text = await res.text();
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  if (!res.ok) {
+    const message =
+      (data && typeof data === 'object' && 'message' in data && typeof (data as { message: unknown }).message === 'string'
+        ? (data as { message: string }).message
+        : null) || `Upload failed (${res.status})`;
+    throw new ApiError(message, res.status);
+  }
+  return data as T;
+}
+
 export function apiErrorMessage(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (err instanceof ApiError) {
     if (err.status === 401) return 'Your session has expired. Please log in again.';

@@ -1,5 +1,7 @@
-import dotenv from 'dotenv';
-dotenv.config();
+// Must be the first import: ESM hoists imports, so a plain dotenv.config()
+// call would run only AFTER route modules (which read process.env at load
+// time, e.g. JWT_SECRET, OPENAI_API_KEY) have already been evaluated.
+import 'dotenv/config';
 
 import express from 'express';
 import mongoose from 'mongoose';

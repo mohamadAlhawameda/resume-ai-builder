@@ -27,7 +27,10 @@ router.use(aiLimiter);
 
 const baseSchema = Joi.object({
   type: Joi.string()
-    .valid('summary', 'bullets', 'skills', 'achievements', 'cover-letter', 'linkedin-summary', 'bio', 'tailor-bullets')
+    .valid(
+      'summary', 'bullets', 'skills', 'achievements', 'cover-letter', 'linkedin-summary', 'bio', 'tailor-bullets',
+      'interview-prep', 'linkedin-headline', 'recruiter-message', 'follow-up-email', 'thank-you-email'
+    )
     .required(),
   data: resumeDataSchema.required(),
   // Optional context depending on type
@@ -37,6 +40,8 @@ const baseSchema = Joi.object({
   targetRole: Joi.string().allow('').max(200).default(''),
   tone: Joi.string().valid('professional', 'confident', 'friendly').default('professional'),
   experienceIndex: Joi.number().integer().min(0).max(29).optional(),
+  // Recipient for outreach messages (recruiter, interviewer) — optional.
+  recipientName: Joi.string().allow('').max(120).default(''),
 });
 
 function fallbackFor(type, body) {
@@ -81,6 +86,44 @@ function fallbackFor(type, body) {
       };
     case 'tailor-bullets':
       return { rewrites: [] };
+    case 'interview-prep': {
+      const topSkills = (data.skills || []).filter(Boolean).slice(0, 3);
+      const lastRole = data.experience?.[0]?.role || role;
+      const questions = [
+        { question: `Walk me through your background and what led you to apply for this ${jobTitle || role} position.`, category: 'general', starHint: 'Keep it to 90 seconds: current role, one relevant achievement, why this job.' },
+        { question: `Tell me about a challenging problem you faced as a ${lastRole} and how you solved it.`, category: 'behavioral', starHint: 'Situation: the problem and stakes. Task: your responsibility. Action: the specific steps YOU took. Result: the measurable outcome.' },
+        ...topSkills.map((s) => ({
+          question: `Can you describe a project where you used ${s}? What was your specific contribution?`,
+          category: 'technical',
+          starHint: `Pick one real project from your resume. Name the situation, your task, how you applied ${s}, and what improved because of it.`,
+        })),
+        { question: 'Tell me about a time you disagreed with a teammate or manager. How did you handle it?', category: 'behavioral', starHint: 'Show respect for the other view, the action you took to resolve it, and the working relationship afterwards.' },
+        { question: 'Describe a mistake you made at work and what you learned from it.', category: 'behavioral', starHint: 'Choose a real, contained mistake. Spend most of the answer on the fix and the process change you made.' },
+        { question: `Why do you want to work${company ? ` at ${company}` : ' here'}, and what would you bring in the first 90 days?`, category: 'motivation', starHint: 'Connect one of their needs (from the job posting) to one of your proven strengths.' },
+        { question: 'Where do you see your career going in the next few years?', category: 'general', starHint: 'Tie your growth goals to the role you are interviewing for — ambition with relevance.' },
+      ];
+      return { questions };
+    }
+    case 'linkedin-headline':
+      return {
+        suggestions: [
+          `${role.charAt(0).toUpperCase() + role.slice(1)}${skills ? ` | ${skills.split(', ').slice(0, 3).join(' · ')}` : ''}`,
+          `${role.charAt(0).toUpperCase() + role.slice(1)} — delivering measurable results${skills ? ` with ${skills.split(', ')[0]}` : ''}`,
+          `${role.charAt(0).toUpperCase() + role.slice(1)} | Open to new opportunities`,
+        ],
+      };
+    case 'recruiter-message':
+      return {
+        text: `Hi ${body.recipientName || '[Name]'},\n\nI came across the ${jobTitle || role} opening${company ? ` at ${company}` : ''} and it closely matches my background${skills ? ` in ${skills}` : ''}. I'd love to be considered — my resume is attached, and I'm happy to share more detail on anything relevant.\n\nWould you be open to a short conversation this week?\n\nBest regards,\n${data.fullName || '[Your name]'}`,
+      };
+    case 'follow-up-email':
+      return {
+        text: `Subject: Following up — ${jobTitle || role} application\n\nHi ${body.recipientName || '[Name]'},\n\nI applied for the ${jobTitle || role} position${company ? ` at ${company}` : ''} recently and wanted to follow up. I remain very interested in the role — my experience${skills ? ` with ${skills}` : ''} maps closely to what you're looking for.\n\nPlease let me know if I can provide anything else to support my application.\n\nBest regards,\n${data.fullName || '[Your name]'}`,
+      };
+    case 'thank-you-email':
+      return {
+        text: `Subject: Thank you — ${jobTitle || role} interview\n\nHi ${body.recipientName || '[Name]'},\n\nThank you for taking the time to speak with me about the ${jobTitle || role} position${company ? ` at ${company}` : ''}. Our conversation reinforced my enthusiasm for the role.\n\n[Add one sentence referencing something specific you discussed.]\n\nI'm excited about the possibility of contributing, and I'm happy to answer any further questions.\n\nBest regards,\n${data.fullName || '[Your name]'}`,
+      };
     default:
       return { suggestions: [] };
   }
@@ -183,6 +226,65 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
           maxTokens: 1000,
         });
         return res.json({ rewrites: (out.rewrites || []).slice(0, 8), aiUsed: true });
+      }
+
+      case 'interview-prep': {
+        const out = await chatJSON({
+          system:
+            'You are an experienced interviewer and career coach. Based on the candidate\'s resume and (if given) the job posting, generate 8–10 realistic interview questions they should prepare for: a mix of behavioral, technical/role-specific (grounded in skills they actually list), motivation, and one or two probing questions about gaps or transitions visible in the resume. For each question give a STAR-method preparation hint that references their real experience — never fabricate accomplishments for them. Return JSON: {"questions":[{"question":"...","category":"behavioral|technical|motivation|general","starHint":"..."}]}',
+          user: `Job title: ${body.jobTitle || body.targetRole || 'not specified'}\nCompany: ${body.company || 'not specified'}\n\nJob description:\n${jd || 'not provided'}\n\nResume:\n${resumeText}`,
+          maxTokens: 1400,
+        });
+        const questions = (out.questions || [])
+          .filter((q) => q && q.question)
+          .slice(0, 10)
+          .map((q) => ({
+            question: String(q.question).slice(0, 500),
+            category: ['behavioral', 'technical', 'motivation', 'general'].includes(q.category) ? q.category : 'general',
+            starHint: String(q.starHint || '').slice(0, 600),
+          }));
+        if (questions.length === 0) return res.json({ ...fallbackFor(type, body), aiUsed: false, degraded: true });
+        return res.json({ questions, aiUsed: true });
+      }
+
+      case 'linkedin-headline': {
+        const out = await chatJSON({
+          system:
+            'Write LinkedIn headlines (max 220 characters each): specific, keyword-rich, no fluff like "passionate" or "guru". Ground them only in the resume provided. Return JSON: {"suggestions":["...","...","..."]} with 3–4 distinct options.',
+          user: `Target role: ${body.targetRole || data.targetRole || 'not specified'}\n\nResume:\n${resumeText}`,
+          maxTokens: 300,
+        });
+        return res.json({ suggestions: (out.suggestions || []).map((s) => String(s).slice(0, 220)).slice(0, 4), aiUsed: true });
+      }
+
+      case 'recruiter-message': {
+        const text = await chatText({
+          system:
+            'Write a short LinkedIn/email message (80–130 words) from a candidate to a recruiter about a specific role. Professional, direct, no groveling. Reference only real experience from the resume — never invent qualifications. Plain text, no markdown, no subject line.',
+          user: `Recipient: ${body.recipientName || 'the recruiter'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nJob description:\n${jd || 'not provided'}\n\nResume:\n${resumeText}`,
+          maxTokens: 350,
+        });
+        return res.json({ text, aiUsed: true });
+      }
+
+      case 'follow-up-email': {
+        const text = await chatText({
+          system:
+            'Write a polite, concise follow-up email (90–140 words) for a job application that has not received a response. Include a subject line on the first line ("Subject: ..."). Reaffirm interest, reference one genuinely relevant strength from the resume, and close with a light call to action. Never invent experience. Plain text.',
+          user: `Recipient: ${body.recipientName || 'the hiring team'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}`,
+          maxTokens: 350,
+        });
+        return res.json({ text, aiUsed: true });
+      }
+
+      case 'thank-you-email': {
+        const text = await chatText({
+          system:
+            'Write a post-interview thank-you email (90–140 words) with a subject line on the first line ("Subject: ..."). Warm but professional: thank them, reinforce fit with one real strength from the resume, and leave a placeholder like [something specific you discussed] for the personal touch — never fabricate interview details. Plain text.',
+          user: `Recipient: ${body.recipientName || 'the interviewer'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}`,
+          maxTokens: 350,
+        });
+        return res.json({ text, aiUsed: true });
       }
 
       default:

@@ -21,6 +21,7 @@ import Badge, { scoreTone } from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import ImportResumeButton from '@/components/ImportResumeButton';
 import ResumePreview from '@/components/ResumePreview';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
@@ -166,9 +167,16 @@ export default function ResumesPage() {
             Duplicate a resume to tailor it per job. Every save keeps a version you can restore.
           </p>
         </div>
-        <Button icon={<FilePlus2 className="w-4 h-4" />} onClick={() => router.push('/resume')}>
-          New resume
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ImportResumeButton
+            onImported={(result) => {
+              router.push(`/resume/edit/${result.resume._id}`);
+            }}
+          />
+          <Button icon={<FilePlus2 className="w-4 h-4" />} onClick={() => router.push('/resume')}>
+            New resume
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -182,8 +190,18 @@ export default function ResumesPage() {
           <EmptyState
             icon={<FileText className="w-6 h-6" />}
             title="No resumes yet"
-            description="Create your first resume — the builder guides you step by step with AI suggestions."
-            action={<Button onClick={() => router.push('/resume')}>Start building</Button>}
+            description="Upload the resume you already have (PDF or DOCX) or create one from scratch — the builder guides you step by step with AI suggestions."
+            action={
+              <div className="flex flex-col sm:flex-row gap-2 items-center justify-center">
+                <ImportResumeButton
+                  variant="primary"
+                  onImported={(result) => router.push(`/resume/edit/${result.resume._id}`)}
+                />
+                <Button variant="outline" onClick={() => router.push('/resume')}>
+                  Start building
+                </Button>
+              </div>
+            }
           />
         </Card>
       ) : (

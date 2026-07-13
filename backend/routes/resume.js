@@ -1,9 +1,12 @@
 import express from 'express';
 import Joi from 'joi';
 import mongoose from 'mongoose';
+import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import Resume, { MAX_VERSIONS } from '../models/Resume.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { validateBody, resumeDataSchema } from '../utils/validate.js';
+import { importResumeFromFile } from '../services/importResume.js';
 
 const router = express.Router();
 
@@ -65,6 +68,82 @@ router.post('/create', validateBody(createSchema), async (req, res) => {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// POST /resume/import — upload a PDF/DOCX, parse it into a new resume.
+// File stays in memory only (never written to disk) and is discarded after
+// parsing. Strict type + size limits; per-user rate limit on top of global.
+// ---------------------------------------------------------------------------
+
+const ACCEPTED_MIMETYPES = new Set([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = ACCEPTED_MIMETYPES.has(file.mimetype) || /\.(pdf|docx)$/i.test(file.originalname || '');
+    cb(ok ? null : new Error('Only PDF and DOCX files are supported.'), ok);
+  },
+});
+
+const importLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  keyGenerator: (req) => req.user?.userId || req.ip,
+  message: { message: 'Too many imports — please wait a few minutes and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post('/import', importLimiter, (req, res) => {
+  upload.single('file')(req, res, async (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ message: 'File is too large — the limit is 5 MB.' });
+      }
+      return res.status(400).json({ message: err.message || 'Upload failed.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file received — attach a PDF or DOCX file.' });
+    }
+
+    try {
+      const { data, warnings, confidence, aiUsed } = await importResumeFromFile(
+        req.file.buffer,
+        req.file.mimetype,
+        req.file.originalname || ''
+      );
+
+      // Final safety net: the parsed object must satisfy the same schema as
+      // hand-entered resume data.
+      const { error, value } = resumeDataSchema.validate(data, { stripUnknown: true });
+      if (error) {
+        console.error('Parsed resume failed validation:', error.message);
+        return res.status(422).json({ message: 'The file was read but could not be converted into a resume. Please try a different export of your resume.' });
+      }
+
+      const baseName = (req.file.originalname || 'resume').replace(/\.(pdf|docx)$/i, '');
+      const resume = new Resume({
+        userId: req.user.userId,
+        data: value,
+        templateId: 'classic',
+        title: `Imported — ${baseName}`.slice(0, 160),
+      });
+      await resume.save();
+
+      const { versions, ...rest } = resume.toObject();
+      res.status(201).json({ resume: rest, warnings, confidence, aiUsed });
+    } catch (e) {
+      if (e.status === 422) return res.status(422).json({ message: e.message });
+      if (/Unsupported file type/.test(e.message || '')) return res.status(400).json({ message: e.message });
+      console.error('Resume import failed:', e);
+      res.status(500).json({ message: 'We could not process that file. Please try again or use a different format.' });
+    }
+  });
 });
 
 // GET /resume/resumes — all resumes for logged-in user (without heavy versions)

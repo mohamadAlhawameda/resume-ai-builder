@@ -19,6 +19,7 @@ import {
   Bell,
   DollarSign,
   Trash2,
+  MessagesSquare,
 } from 'lucide-react';
 import clsx from 'clsx';
 import Card from '@/components/ui/Card';
@@ -156,12 +157,13 @@ function JobsContent() {
     }
   };
 
-  const handleCoverLetter = (job: Job) => {
+  // Hand a job's context to the AI tools page (cover letter, interview prep, …).
+  const openToolForJob = (job: Job, tool: 'cover-letter' | 'interview-prep' | 'follow-up-email' | 'thank-you-email') => {
     sessionStorage.setItem(
       'tools:jobContext',
       JSON.stringify({ jobTitle: job.title, company: job.company, jobDescription: job.description })
     );
-    router.push('/tools?tool=cover-letter');
+    router.push(`/tools?tool=${tool}`);
   };
 
   const handleAnalyzeAgainstJob = (job: Job) => {
@@ -437,9 +439,17 @@ function JobsContent() {
                           size="sm"
                           variant="outline"
                           icon={<Sparkles className="w-3.5 h-3.5" />}
-                          onClick={() => handleCoverLetter(job)}
+                          onClick={() => openToolForJob(job, 'cover-letter')}
                         >
                           Cover letter
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          icon={<MessagesSquare className="w-3.5 h-3.5" />}
+                          onClick={() => openToolForJob(job, 'interview-prep')}
+                        >
+                          Interview prep
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => handleAnalyzeAgainstJob(job)}>
                           Full match report
@@ -529,6 +539,34 @@ function JobsContent() {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+                      </div>
+
+                      {/* Next-step AI actions matched to where the application is */}
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2 items-center">
+                        <span className="text-xs text-slate-400 font-medium uppercase tracking-wide mr-1">Prepare</span>
+                        {saved.status === 'saved' && (
+                          <Button size="sm" variant="outline" icon={<Sparkles className="w-3.5 h-3.5" />} onClick={() => openToolForJob(saved.job, 'cover-letter')}>
+                            Cover letter
+                          </Button>
+                        )}
+                        {saved.status === 'applied' && (
+                          <Button size="sm" variant="outline" onClick={() => openToolForJob(saved.job, 'follow-up-email')}>
+                            Follow-up email
+                          </Button>
+                        )}
+                        {saved.status === 'interviewing' && (
+                          <Button size="sm" variant="outline" onClick={() => openToolForJob(saved.job, 'thank-you-email')}>
+                            Thank-you email
+                          </Button>
+                        )}
+                        {(saved.status === 'saved' || saved.status === 'applied' || saved.status === 'interviewing') && (
+                          <Button size="sm" variant="outline" icon={<MessagesSquare className="w-3.5 h-3.5" />} onClick={() => openToolForJob(saved.job, 'interview-prep')}>
+                            Interview prep
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => handleAnalyzeAgainstJob(saved.job)}>
+                          Match report
+                        </Button>
                       </div>
                     </Card>
                   );

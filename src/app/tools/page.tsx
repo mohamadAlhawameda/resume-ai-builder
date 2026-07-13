@@ -4,36 +4,110 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { Mail, Linkedin, User, Sparkles, Copy, Download, FileText } from 'lucide-react';
+import {
+  Mail,
+  Linkedin,
+  User,
+  Sparkles,
+  Copy,
+  Download,
+  FileText,
+  MessagesSquare,
+  Send,
+  Reply,
+  MailCheck,
+  Type,
+} from 'lucide-react';
 import clsx from 'clsx';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
-import type { ResumeRecord } from '@/lib/types';
+import type { ResumeRecord, InterviewQuestion } from '@/lib/types';
 
-type Tool = 'cover-letter' | 'linkedin-summary' | 'bio';
+type Tool =
+  | 'cover-letter'
+  | 'interview-prep'
+  | 'linkedin-summary'
+  | 'linkedin-headline'
+  | 'recruiter-message'
+  | 'follow-up-email'
+  | 'thank-you-email'
+  | 'bio';
 
-const TOOLS: { id: Tool; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
+interface ToolFields {
+  job?: boolean; // job title + company
+  jd?: boolean; // job description textarea
+  recipient?: boolean; // recipient name
+  targetRole?: boolean;
+  tone?: boolean;
+}
+
+const TOOLS: {
+  id: Tool;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+  fields: ToolFields;
+}[] = [
   {
     id: 'cover-letter',
     label: 'Cover Letter',
     icon: Mail,
     description: 'A tailored cover letter grounded in your resume and the job you are applying to.',
+    fields: { job: true, jd: true, tone: true },
+  },
+  {
+    id: 'interview-prep',
+    label: 'Interview Prep',
+    icon: MessagesSquare,
+    description: 'Likely interview questions for this job, each with a STAR-method preparation hint.',
+    fields: { job: true, jd: true },
+  },
+  {
+    id: 'recruiter-message',
+    label: 'Recruiter Message',
+    icon: Send,
+    description: 'A short outreach or referral-request message about a specific opening.',
+    fields: { job: true, jd: true, recipient: true, tone: true },
+  },
+  {
+    id: 'follow-up-email',
+    label: 'Follow-up Email',
+    icon: Reply,
+    description: 'A polite nudge when an application has gone quiet.',
+    fields: { job: true, recipient: true, tone: true },
+  },
+  {
+    id: 'thank-you-email',
+    label: 'Thank-you Email',
+    icon: MailCheck,
+    description: 'A post-interview thank-you note that reinforces your fit.',
+    fields: { job: true, recipient: true, tone: true },
   },
   {
     id: 'linkedin-summary',
     label: 'LinkedIn Summary',
     icon: Linkedin,
     description: 'A first-person "About" section for your LinkedIn profile.',
+    fields: { targetRole: true, tone: true },
+  },
+  {
+    id: 'linkedin-headline',
+    label: 'LinkedIn Headline',
+    icon: Type,
+    description: 'Keyword-rich headline options for the top of your profile.',
+    fields: { targetRole: true },
   },
   {
     id: 'bio',
     label: 'Professional Bio',
     icon: User,
     description: 'A short third-person bio for portfolios, talks, or team pages.',
+    fields: {},
   },
 ];
 
@@ -48,12 +122,14 @@ function ToolsContent() {
   const [output, setOutput] = useState('');
   const [aiUsed, setAiUsed] = useState(true);
 
-  // Cover letter inputs
+  // Shared generator inputs (which ones show depends on the selected tool)
   const [jobTitle, setJobTitle] = useState('');
   const [company, setCompany] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [tone, setTone] = useState<'professional' | 'confident' | 'friendly'>('professional');
   const [targetRole, setTargetRole] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -68,7 +144,7 @@ function ToolsContent() {
       .catch((err) => toast.error(apiErrorMessage(err, 'Could not load resumes.')))
       .finally(() => setLoading(false));
 
-    // Prefill from job discovery ("Cover letter" button on a job card)
+    // Prefill from job discovery ("Cover letter" / "Interview prep" on a job card)
     const ctx = sessionStorage.getItem('tools:jobContext');
     if (ctx) {
       try {
@@ -76,13 +152,14 @@ function ToolsContent() {
         setJobTitle(parsed.jobTitle || '');
         setCompany(parsed.company || '');
         setJobDescription(parsed.jobDescription || '');
-        setTool('cover-letter');
+        const requested = searchParams.get('tool') as Tool | null;
+        if (!requested || !TOOLS.some((t) => t.id === requested)) setTool('cover-letter');
       } catch {
         /* ignore */
       }
       sessionStorage.removeItem('tools:jobContext');
     }
-  }, [router]);
+  }, [router, searchParams]);
 
   const resume = resumes.find((r) => r._id === selectedResume);
 
@@ -93,8 +170,9 @@ function ToolsContent() {
     }
     setGenerating(true);
     setOutput('');
+    setQuestions([]);
     try {
-      const res = await api<{ text?: string; suggestions?: string[]; aiUsed?: boolean }>('/generate', {
+      const res = await api<{ text?: string; suggestions?: string[]; questions?: InterviewQuestion[]; aiUsed?: boolean }>('/generate', {
         method: 'POST',
         body: {
           type: tool,
@@ -104,9 +182,20 @@ function ToolsContent() {
           jobDescription,
           tone,
           targetRole,
+          recipientName,
         },
       });
-      setOutput(res.text || (res.suggestions || []).join('\n\n'));
+      if (res.questions && res.questions.length > 0) {
+        setQuestions(res.questions);
+        // Plain-text version powers the Copy / .txt buttons.
+        setOutput(
+          res.questions
+            .map((q, i) => `${i + 1}. [${q.category}] ${q.question}\n   How to prepare: ${q.starHint}`)
+            .join('\n\n')
+        );
+      } else {
+        setOutput(res.text || (res.suggestions || []).join('\n\n'));
+      }
       setAiUsed(res.aiUsed !== false);
       if (res.aiUsed === false) {
         toast.info('AI is not configured on the server — this is a starter template to edit.');
@@ -165,7 +254,7 @@ function ToolsContent() {
       ) : (
         <>
           {/* Tool selector */}
-          <div className="grid sm:grid-cols-3 gap-3 mb-6" role="tablist" aria-label="Writing tools">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" role="tablist" aria-label="Writing tools">
             {TOOLS.map(({ id, label, icon: Icon, description }) => (
               <button
                 key={id}
@@ -174,6 +263,7 @@ function ToolsContent() {
                 onClick={() => {
                   setTool(id);
                   setOutput('');
+                  setQuestions([]);
                 }}
                 className={clsx(
                   'text-left p-4 rounded-2xl border transition-all duration-150',
@@ -212,51 +302,67 @@ function ToolsContent() {
                 </select>
               </div>
 
-              {tool === 'cover-letter' && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="cl-title" className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Job title
-                      </label>
-                      <input
-                        id="cl-title"
-                        value={jobTitle}
-                        onChange={(e) => setJobTitle(e.target.value)}
-                        placeholder="e.g. Frontend Developer"
-                        className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="cl-company" className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Company
-                      </label>
-                      <input
-                        id="cl-company"
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                        placeholder="e.g. Acme Inc."
-                        className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
+              {activeTool.fields.job && (
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="cl-jd" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Job description <span className="text-slate-400 font-normal">(recommended)</span>
+                    <label htmlFor="cl-title" className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Job title
                     </label>
-                    <textarea
-                      id="cl-jd"
-                      rows={6}
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      placeholder="Paste the job description for a sharper letter…"
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                    <input
+                      id="cl-title"
+                      value={jobTitle}
+                      onChange={(e) => setJobTitle(e.target.value)}
+                      placeholder="e.g. Frontend Developer"
+                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                </>
+                  <div>
+                    <label htmlFor="cl-company" className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Company
+                    </label>
+                    <input
+                      id="cl-company"
+                      value={company}
+                      onChange={(e) => setCompany(e.target.value)}
+                      placeholder="e.g. Acme Inc."
+                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
               )}
 
-              {tool === 'linkedin-summary' && (
+              {activeTool.fields.recipient && (
+                <div>
+                  <label htmlFor="recipient" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Recipient name <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="recipient"
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    placeholder="e.g. Sarah (the recruiter or interviewer)"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              {activeTool.fields.jd && (
+                <div>
+                  <label htmlFor="cl-jd" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Job description <span className="text-slate-400 font-normal">(recommended)</span>
+                  </label>
+                  <textarea
+                    id="cl-jd"
+                    rows={6}
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    placeholder="Paste the job description for a sharper result…"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                  />
+                </div>
+              )}
+
+              {activeTool.fields.targetRole && (
                 <div>
                   <label htmlFor="li-role" className="block text-sm font-medium text-slate-700 mb-1.5">
                     Target role <span className="text-slate-400 font-normal">(optional)</span>
@@ -271,7 +377,7 @@ function ToolsContent() {
                 </div>
               )}
 
-              {tool !== 'bio' && (
+              {activeTool.fields.tone && (
                 <div>
                   <label htmlFor="tool-tone" className="block text-sm font-medium text-slate-700 mb-1.5">
                     Tone
@@ -321,17 +427,47 @@ function ToolsContent() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col">
                   {!aiUsed && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-                      Starter template (AI not configured on server) — fill in the bracketed parts.
+                      {questions.length > 0
+                        ? 'Standard question set (AI not configured on server) — still worth practicing with your real examples.'
+                        : 'Starter template (AI not configured on server) — fill in the bracketed parts.'}
                     </p>
                   )}
-                  <textarea
-                    value={output}
-                    onChange={(e) => setOutput(e.target.value)}
-                    rows={14}
-                    aria-label="Generated text (editable)"
-                    className="flex-1 w-full text-sm text-slate-800 leading-relaxed border border-slate-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
-                  />
-                  <p className="text-xs text-slate-400 mt-2">Edit freely — this is your voice, AI just drafted it.</p>
+                  {questions.length > 0 ? (
+                    <div className="space-y-3 max-h-[60vh] overflow-y-auto thin-scrollbar pr-1">
+                      {questions.map((q, i) => (
+                        <div key={i} className="border border-slate-200 rounded-xl p-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-900">
+                              {i + 1}. {q.question}
+                            </p>
+                            <Badge
+                              tone={q.category === 'technical' ? 'blue' : q.category === 'behavioral' ? 'purple' : 'slate'}
+                              className="shrink-0"
+                            >
+                              {q.category}
+                            </Badge>
+                          </div>
+                          {q.starHint && (
+                            <p className="text-xs text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                              <span className="font-semibold text-slate-700">How to prepare (STAR): </span>
+                              {q.starHint}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <textarea
+                        value={output}
+                        onChange={(e) => setOutput(e.target.value)}
+                        rows={14}
+                        aria-label="Generated text (editable)"
+                        className="flex-1 w-full text-sm text-slate-800 leading-relaxed border border-slate-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                      />
+                      <p className="text-xs text-slate-400 mt-2">Edit freely — this is your voice, AI just drafted it.</p>
+                    </>
+                  )}
                 </motion.div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-center">

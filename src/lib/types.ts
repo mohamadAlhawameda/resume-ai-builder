@@ -223,6 +223,21 @@ export interface SavedJob {
   updatedAt: string;
 }
 
+/** Response from POST /resume/import (PDF/DOCX upload). */
+export interface ImportResumeResult {
+  resume: ResumeRecord;
+  warnings: string[];
+  confidence: number; // 0–100, share of core sections detected
+  aiUsed: boolean;
+}
+
+/** One AI-generated interview question with STAR preparation guidance. */
+export interface InterviewQuestion {
+  question: string;
+  category: 'behavioral' | 'technical' | 'motivation' | 'general';
+  starHint: string;
+}
+
 export interface AppNotification {
   _id: string;
   type: 'job-match' | 'scan' | 'system';

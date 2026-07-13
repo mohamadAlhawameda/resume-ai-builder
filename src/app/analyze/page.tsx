@@ -26,6 +26,7 @@ import ScoreRing, { scoreLabel } from '@/components/ui/ScoreRing';
 import ScoreBar from '@/components/ui/ScoreBar';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import ImportResumeButton from '@/components/ImportResumeButton';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
 import {
@@ -35,6 +36,7 @@ import {
   type JobMatchResult,
   type ScanHistoryItem,
   type ScanCategoryKey,
+  type ImportResumeResult,
 } from '@/lib/types';
 
 type Tab = 'scan' | 'match';
@@ -59,6 +61,7 @@ function AnalyzeContent() {
   const [match, setMatch] = useState<JobMatchResult | null>(null);
 
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
+  const [importInfo, setImportInfo] = useState<ImportResumeResult | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -97,8 +100,9 @@ function AnalyzeContent() {
     }
   }, []);
 
-  const runScan = async () => {
-    if (!selectedResume) {
+  const runScan = async (resumeIdOverride?: string) => {
+    const resumeId = resumeIdOverride || selectedResume;
+    if (!resumeId) {
       toast.info('Create a resume first, then scan it.');
       return;
     }
@@ -107,7 +111,7 @@ function AnalyzeContent() {
     try {
       const result = await api<ScanResult>('/analysis/scan', {
         method: 'POST',
-        body: { resumeId: selectedResume },
+        body: { resumeId },
       });
       setScan(result);
       setExpanded(null);
@@ -117,6 +121,16 @@ function AnalyzeContent() {
     } finally {
       setScanning(false);
     }
+  };
+
+  // Uploaded PDF/DOCX was parsed into a new resume — select it, surface what
+  // was detected, and score it right away.
+  const handleImported = (result: ImportResumeResult) => {
+    setResumes((prev) => [result.resume, ...prev]);
+    setSelectedResume(result.resume._id);
+    setImportInfo(result);
+    setTab('scan');
+    runScan(result.resume._id);
   };
 
   const runMatch = async () => {
@@ -170,9 +184,16 @@ function AnalyzeContent() {
         <Card>
           <EmptyState
             icon={<FileText className="w-6 h-6" />}
-            title="You need a resume first"
-            description="Create and save a resume, then come back to scan it."
-            action={<Button onClick={() => router.push('/resume')}>Create resume</Button>}
+            title="Start with your resume"
+            description="Upload the resume you already have (PDF or DOCX) and we'll parse and score it instantly — or build one from scratch."
+            action={
+              <div className="flex flex-col sm:flex-row gap-2 items-center justify-center">
+                <ImportResumeButton variant="primary" onImported={handleImported} />
+                <Button variant="outline" onClick={() => router.push('/resume')}>
+                  Create from scratch
+                </Button>
+              </div>
+            }
           />
         </Card>
       ) : (
@@ -252,9 +273,9 @@ function AnalyzeContent() {
                 </div>
               )}
 
-              <div className="mt-4">
+              <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
                 {tab === 'scan' ? (
-                  <Button icon={<ScanSearch className="w-4 h-4" />} loading={scanning} onClick={runScan} size="lg">
+                  <Button icon={<ScanSearch className="w-4 h-4" />} loading={scanning} onClick={() => runScan()} size="lg">
                     {scanning ? 'Scanning…' : 'Scan my resume'}
                   </Button>
                 ) : (
@@ -262,8 +283,41 @@ function AnalyzeContent() {
                     {matching ? 'Comparing…' : 'Compare with job'}
                   </Button>
                 )}
+                <ImportResumeButton onImported={handleImported} label="Import another resume" />
               </div>
             </Card>
+
+            {/* Import review notice */}
+            {importInfo && selectedResume === importInfo.resume._id && (
+              <Card className="border-blue-200 bg-blue-50/50">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600" aria-hidden />
+                      Imported “{importInfo.resume.title || 'resume'}”
+                    </h3>
+                    <p className="text-sm text-slate-600 mt-1">
+                      We detected {importInfo.confidence}% of the core sections
+                      {importInfo.aiUsed ? ' (AI-assisted parsing — only text from your file was used)' : ''}. Please
+                      review the details before applying to jobs.
+                    </p>
+                    {importInfo.warnings.length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {importInfo.warnings.map((w, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" aria-hidden />
+                            {w}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => router.push(`/resume/edit/${importInfo.resume._id}`)}>
+                    Review in builder <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </Card>
+            )}
 
             {/* ---------- Scan results ---------- */}
             <AnimatePresence>
