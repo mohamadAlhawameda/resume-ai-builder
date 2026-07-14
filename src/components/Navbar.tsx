@@ -17,6 +17,7 @@ import {
   FilePlus2,
   Radar,
   UserCircle2,
+  LayoutGrid,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -28,15 +29,19 @@ import { useLocale } from '@/i18n/LocaleProvider';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import type { AppNotification } from '@/lib/types';
 
-const NAV_LINKS = [
-  { href: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard, auth: true },
-  { href: '/resume', labelKey: 'nav.builder', icon: FilePlus2, auth: false },
-  { href: '/resumes', labelKey: 'nav.myResumes', icon: FileText, auth: true },
-  { href: '/analyze', labelKey: 'nav.analyze', icon: ScanSearch, auth: true },
-  { href: '/jobs', labelKey: 'nav.jobs', icon: Briefcase, auth: true },
-  { href: '/radar', labelKey: 'nav.radar', icon: Radar, auth: true },
-  { href: '/profile', labelKey: 'nav.profile', icon: UserCircle2, auth: true },
-  { href: '/tools', labelKey: 'nav.aiTools', icon: Sparkles, auth: true },
+// Kept to 3 core sections on the top-level bar — Analyze/Radar/AI Tools live
+// in the "Tools" dropdown and Career Profile lives in the account menu, so
+// the bar never has to wrap or scroll regardless of translated label length.
+const PRIMARY_LINKS = [
+  { href: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { href: '/jobs', labelKey: 'nav.jobs', icon: Briefcase },
+  { href: '/resumes', labelKey: 'nav.myResumes', icon: FileText },
+];
+
+const TOOLS_LINKS = [
+  { href: '/analyze', labelKey: 'nav.analyze', icon: ScanSearch },
+  { href: '/radar', labelKey: 'nav.radar', icon: Radar },
+  { href: '/tools', labelKey: 'nav.aiTools', icon: Sparkles },
 ];
 
 export default function Navbar() {
@@ -47,11 +52,13 @@ export default function Navbar() {
   const [isClient, setIsClient] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const isAuthenticated = useAuthStatus();
   const menuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setIsClient(true), []);
 
@@ -60,6 +67,7 @@ export default function Navbar() {
     setIsOpen(false);
     setUserMenuOpen(false);
     setNotifOpen(false);
+    setToolsOpen(false);
   }, [pathname]);
 
   // Click-outside to close dropdowns
@@ -67,6 +75,7 @@ export default function Navbar() {
     const onClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) setToolsOpen(false);
     };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
@@ -102,8 +111,17 @@ export default function Navbar() {
   };
 
   const user = isClient ? getUser() : null;
-  const links = NAV_LINKS.filter((l) => !l.auth || (isClient && isAuthenticated));
   const isActive = (href: string) => pathname === href || (href !== '/' && pathname?.startsWith(`${href}/`));
+  const toolsActive = TOOLS_LINKS.some((l) => isActive(l.href));
+  const authed = isClient && isAuthenticated;
+
+  const navLinkClass = (active: boolean) =>
+    clsx(
+      'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap shrink-0',
+      active
+        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
+        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+    );
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
@@ -122,33 +140,76 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop nav — nowrap + horizontal scroll so a longer translated
-            label (or the full 8-link authenticated set) never stacks text
-            inside a pill; it scrolls instead of wrapping. */}
-        <nav
-          className="hidden lg:flex items-center gap-1 flex-1 min-w-0 overflow-x-auto thin-scrollbar"
-          aria-label="Primary"
-        >
-          {links.map(({ href, labelKey, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={isActive(href) ? 'page' : undefined}
-              className={clsx(
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap shrink-0',
-                isActive(href)
-                  ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              )}
-            >
-              <Icon className="w-4 h-4 shrink-0" aria-hidden />
-              {t(labelKey)}
-            </Link>
-          ))}
-        </nav>
+        {/* Desktop nav — a fixed, small set of top-level items (never more
+            than 4) so it always fits on one line regardless of translated
+            label length; no wrap, no scroll. */}
+        {authed && (
+          <nav className="hidden lg:flex items-center gap-1" aria-label="Primary">
+            {PRIMARY_LINKS.map(({ href, labelKey, icon: Icon }) => (
+              <Link key={href} href={href} aria-current={isActive(href) ? 'page' : undefined} className={navLinkClass(isActive(href))}>
+                <Icon className="w-4 h-4 shrink-0" aria-hidden />
+                {t(labelKey)}
+              </Link>
+            ))}
 
-        <div className="flex items-center gap-2 shrink-0">
-          {isClient && isAuthenticated ? (
+            {/* Tools dropdown — groups Analyze / Opportunity Radar / AI Tools */}
+            <div className="relative" ref={toolsRef}>
+              <button
+                onClick={() => setToolsOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={toolsOpen}
+                className={navLinkClass(toolsActive)}
+              >
+                <LayoutGrid className="w-4 h-4 shrink-0" aria-hidden />
+                {t('nav.tools')}
+                <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', toolsOpen && 'rotate-180')} aria-hidden />
+              </button>
+              <AnimatePresence>
+                {toolsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-2"
+                    role="menu"
+                  >
+                    {TOOLS_LINKS.map(({ href, labelKey, icon: Icon }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        role="menuitem"
+                        aria-current={isActive(href) ? 'page' : undefined}
+                        className={clsx(
+                          'flex items-center gap-2.5 px-4 py-2 text-sm transition',
+                          isActive(href) ? 'text-blue-700 bg-blue-50/60' : 'text-slate-700 hover:bg-slate-50'
+                        )}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" aria-hidden />
+                        {t(labelKey)}
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </nav>
+        )}
+
+        <div className="flex items-center gap-2 shrink-0 ms-auto">
+          {/* Primary create-action — a distinct CTA rather than a plain nav
+              pill, so it reads as "the thing you do here," not just another link. */}
+          {authed && (
+            <Link
+              href="/resume"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-b from-blue-600 to-blue-700 text-white hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
+            >
+              <FilePlus2 className="w-4 h-4" aria-hidden />
+              {t('nav.newResume')}
+            </Link>
+          )}
+
+          {authed ? (
             <>
               {/* Notifications */}
               <div className="relative" ref={notifRef}>
@@ -223,7 +284,8 @@ export default function Navbar() {
                 </AnimatePresence>
               </div>
 
-              {/* User menu (desktop) */}
+              {/* User menu (desktop) — Career Profile lives here, next to
+                  Logout, rather than as a 4th top-level nav pill. */}
               <div className="relative hidden md:block" ref={menuRef}>
                 <button
                   onClick={() => setUserMenuOpen((v) => !v)}
@@ -250,6 +312,17 @@ export default function Navbar() {
                         <p className="text-sm font-semibold text-slate-900 truncate">{user?.name}</p>
                         <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                       </div>
+                      <Link
+                        href="/profile"
+                        role="menuitem"
+                        aria-current={isActive('/profile') ? 'page' : undefined}
+                        className={clsx(
+                          'flex items-center gap-2 px-4 py-2 text-sm transition',
+                          isActive('/profile') ? 'text-blue-700 bg-blue-50/60' : 'text-slate-700 hover:bg-slate-50'
+                        )}
+                      >
+                        <UserCircle2 className="w-4 h-4" aria-hidden /> {t('nav.profile')}
+                      </Link>
                       <button
                         onClick={handleLogout}
                         role="menuitem"
@@ -310,39 +383,88 @@ export default function Navbar() {
             aria-label="Mobile"
           >
             <div className="px-4 py-3 space-y-1">
-              {links.map(({ href, labelKey, icon: Icon }) => (
+              {authed && (
                 <Link
-                  key={href}
-                  href={href}
+                  href="/resume"
                   onClick={() => setIsOpen(false)}
-                  aria-current={isActive(href) ? 'page' : undefined}
-                  className={clsx(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
-                    isActive(href)
-                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
-                      : 'text-slate-700 hover:bg-slate-100'
-                  )}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 mb-2 rounded-xl text-sm font-semibold bg-gradient-to-b from-blue-600 to-blue-700 text-white shadow-sm shadow-blue-600/25 transition"
                 >
-                  <Icon className="w-5 h-5" aria-hidden />
-                  {t(labelKey)}
+                  <FilePlus2 className="w-4 h-4" aria-hidden /> {t('nav.newResume')}
                 </Link>
-              ))}
+              )}
+
+              {authed &&
+                PRIMARY_LINKS.map(({ href, labelKey, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setIsOpen(false)}
+                    aria-current={isActive(href) ? 'page' : undefined}
+                    className={clsx(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
+                      isActive(href)
+                        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    )}
+                  >
+                    <Icon className="w-5 h-5" aria-hidden />
+                    {t(labelKey)}
+                  </Link>
+                ))}
+
+              {authed && (
+                <>
+                  <p className="px-3 pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('nav.tools')}</p>
+                  {TOOLS_LINKS.map(({ href, labelKey, icon: Icon }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setIsOpen(false)}
+                      aria-current={isActive(href) ? 'page' : undefined}
+                      className={clsx(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
+                        isActive(href)
+                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      )}
+                    >
+                      <Icon className="w-5 h-5" aria-hidden />
+                      {t(labelKey)}
+                    </Link>
+                  ))}
+                </>
+              )}
 
               <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                 <LanguageSwitcher />
               </div>
 
               <div className="pt-2 mt-2 border-t border-slate-100">
-                {isClient && isAuthenticated ? (
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      handleLogout();
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition"
-                  >
-                    <LogOut className="w-5 h-5" aria-hidden /> {t('nav.logout')}
-                  </button>
+                {authed ? (
+                  <>
+                    <Link
+                      href="/profile"
+                      onClick={() => setIsOpen(false)}
+                      aria-current={isActive('/profile') ? 'page' : undefined}
+                      className={clsx(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
+                        isActive('/profile')
+                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      )}
+                    >
+                      <UserCircle2 className="w-5 h-5" aria-hidden /> {t('nav.profile')}
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                    >
+                      <LogOut className="w-5 h-5" aria-hidden /> {t('nav.logout')}
+                    </button>
+                  </>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <Link

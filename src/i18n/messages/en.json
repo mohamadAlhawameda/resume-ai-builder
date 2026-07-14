@@ -14,7 +14,9 @@
     "notifications": "Notifications",
     "noNotifications": "No notifications yet. Strong job matches will appear here.",
     "markAllRead": "Mark all read",
-    "viewJobMatches": "View job matches"
+    "viewJobMatches": "View job matches",
+    "tools": "Tools",
+    "newResume": "New Resume"
   },
   "footer": {
     "tagline": "Build standout resumes, scan them against ATS criteria, and discover jobs that actually match your experience — powered by AI.",

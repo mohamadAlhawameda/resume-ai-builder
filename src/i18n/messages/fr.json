@@ -14,7 +14,9 @@
     "notifications": "Notifications",
     "noNotifications": "Aucune notification pour le moment. Les correspondances d'emploi fortes apparaîtront ici.",
     "markAllRead": "Tout marquer comme lu",
-    "viewJobMatches": "Voir les correspondances"
+    "viewJobMatches": "Voir les correspondances",
+    "tools": "Outils",
+    "newResume": "Nouveau CV"
   },
   "footer": {
     "tagline": "Créez des CV remarquables, évaluez-les selon les critères ATS et découvrez des emplois qui correspondent réellement à votre expérience — propulsé par l'IA.",
