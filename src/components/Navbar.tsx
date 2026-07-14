@@ -122,27 +122,32 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-1" aria-label="Primary">
+        {/* Desktop nav — nowrap + horizontal scroll so a longer translated
+            label (or the full 8-link authenticated set) never stacks text
+            inside a pill; it scrolls instead of wrapping. */}
+        <nav
+          className="hidden lg:flex items-center gap-1 flex-1 min-w-0 overflow-x-auto thin-scrollbar"
+          aria-label="Primary"
+        >
           {links.map(({ href, labelKey, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               aria-current={isActive(href) ? 'page' : undefined}
               className={clsx(
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition',
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap shrink-0',
                 isActive(href)
                   ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               )}
             >
-              <Icon className="w-4 h-4" aria-hidden />
+              <Icon className="w-4 h-4 shrink-0" aria-hidden />
               {t(labelKey)}
             </Link>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {isClient && isAuthenticated ? (
             <>
               {/* Notifications */}

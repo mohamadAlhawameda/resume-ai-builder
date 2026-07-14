@@ -674,8 +674,10 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
         </div>
       </div>
 
-      {/* Hidden full-size copy used for pixel-perfect PDF export */}
-      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+      {/* Hidden full-size copy used for pixel-perfect PDF export. insetInlineStart
+          (not left) keeps this off-canvas on the logical start side under
+          RTL too, so it doesn't blow up the page's scrollable width. */}
+      <div aria-hidden="true" style={{ position: 'absolute', insetInlineStart: '-9999px', top: 0 }}>
         <div ref={exportRef}>
           <ResumePreview data={formData} template={template} />
         </div>
