@@ -55,8 +55,12 @@ const US_COUNTRY_RE = /\b(?:united states|u\.s\.a\.?|usa|u\.s\.)\b/i;
 // Bare "US" only as its own token (case-sensitive so "In-Office"/"us" prose don't match)
 const US_TOKEN_RE = /(?:^|[\s,;\-–—(/])US(?=$|[\s,:;)\-–—/])/;
 const CA_COUNTRY_RE = /\bcanada\b/i;
-// "Remote, North America" / "Remote, Americas" — open to both markets we serve.
-const NORTH_AMERICA_RE = /\bnorth america\b|\bamericas\b/i;
+// "Remote, North America" / "Remote, Northern America" / "Remote, Americas" —
+// open to both markets we serve. (Aggregator feeds like Remotive use both
+// "North America" and "Northern America" phrasing.)
+const NORTH_AMERICA_RE = /\bnorth(?:ern)? america\b|\bamericas\b/i;
+// "Worldwide" / "Anywhere" remote postings are open to US/CA candidates too.
+const WORLDWIDE_RE = /\bworldwide\b|\banywhere\b/i;
 
 /**
  * @param {string} location   raw ATS location string
@@ -74,7 +78,7 @@ export function parseJobLocation(location = '', countryHint = '') {
 
   if (US_COUNTRY_RE.test(text) || US_TOKEN_RE.test(text)) countries.add('US');
   if (CA_COUNTRY_RE.test(text)) countries.add('CA');
-  if (NORTH_AMERICA_RE.test(text)) {
+  if (NORTH_AMERICA_RE.test(text) || WORLDWIDE_RE.test(text)) {
     countries.add('US');
     countries.add('CA');
   }

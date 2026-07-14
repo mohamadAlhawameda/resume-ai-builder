@@ -77,7 +77,7 @@ mongoose
   .then(() => {
     console.log('✅ MongoDB connected');
     if (usingSampleData()) {
-      console.log('ℹ️  Job providers: using SAMPLE data (set GREENHOUSE_BOARDS, LEVER_COMPANIES, or ASHBY_BOARDS for real feeds)');
+      console.log('ℹ️  Job providers: using SAMPLE data (Remotive/Arbeitnow/The Muse unreachable or disabled — check REMOTIVE_ENABLED/ARBEITNOW_ENABLED/THEMUSE_ENABLED, or set GREENHOUSE_BOARDS/LEVER_COMPANIES/ASHBY_BOARDS)');
     }
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);

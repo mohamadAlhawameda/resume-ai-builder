@@ -9,9 +9,19 @@ import mockProvider from './mock.js';
 import greenhouseProvider from './greenhouse.js';
 import leverProvider from './lever.js';
 import ashbyProvider from './ashby.js';
+import remotiveProvider from './remotive.js';
+import arbeitnowProvider from './arbeitnow.js';
+import themuseProvider from './themuse.js';
 import { parseJobLocation, allowedCountries } from '../../utils/jobLocation.js';
 
-const REAL_PROVIDERS = [greenhouseProvider, leverProvider, ashbyProvider];
+const REAL_PROVIDERS = [
+  greenhouseProvider,
+  leverProvider,
+  ashbyProvider,
+  remotiveProvider,
+  arbeitnowProvider,
+  themuseProvider,
+];
 
 // Attach normalized geography and drop postings outside the served markets
 // (JOB_COUNTRIES, default US + Canada; set to "all" to disable).
