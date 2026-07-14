@@ -17,7 +17,7 @@ import SavedJob from '../models/SavedJob.js';
 import User from '../models/User.js';
 import { computeCompleteness } from '../utils/profileCompleteness.js';
 import { fetchAllJobs } from '../providers/jobs/index.js';
-import { scoreJobForUser, summarizeSkillGaps } from '../utils/jobMatch.js';
+import { scoreJobForUser, buildMatchContext, summarizeSkillGaps } from '../utils/jobMatch.js';
 import { resumeToText } from '../utils/text.js';
 import { aiAvailable, chatJSON, truncate } from '../services/ai.js';
 
@@ -402,7 +402,8 @@ router.post(
     const jobs = await fetchAllJobs();
     const resumeLike = toResumeLikeData(profile);
     const prefs = { titles: targetRole ? [targetRole] : profile.targetRoles || [] };
-    const scored = jobs.map((j) => scoreJobForUser(j, resumeLike, prefs));
+    const ctx = buildMatchContext(resumeLike, prefs);
+    const scored = jobs.map((j) => scoreJobForUser(j, ctx));
     const gaps = summarizeSkillGaps(scored, 8);
 
     let roadmap;

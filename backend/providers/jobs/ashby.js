@@ -35,45 +35,51 @@ const ashbyProvider = {
       .map((b) => b.trim())
       .filter(Boolean);
 
-    const results = [];
-    for (const board of boards) {
-      try {
+    // Fetch every board concurrently — sequential awaits here would mean N
+    // boards pay N round-trips end-to-end instead of just the slowest one.
+    const settled = await Promise.allSettled(
+      boards.map(async (board) => {
         const res = await fetchWithTimeout(
           `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(board)}?includeCompensation=true`,
           { timeoutMs: 8000 }
         );
         if (!res.ok) {
           console.warn(`Ashby board "${board}" returned ${res.status}`);
-          continue;
+          return [];
         }
         const data = await res.json();
-        for (const job of data.jobs || []) {
-          if (job.isListed === false) continue;
-          const description = stripHtml(job.descriptionHtml || '').slice(0, 6000);
-          results.push({
-            id: `ashby:${board}:${job.id}`,
-            provider: 'ashby',
-            source: 'Ashby',
-            externalId: job.id,
-            title: job.title || 'Untitled role',
-            company: prettyCompanyName(board),
-            location: job.location || job.secondaryLocations?.[0]?.location || 'Not specified',
-            remote: WORKPLACE_TO_REMOTE[job.workplaceType] || (job.isRemote ? 'remote' : 'unknown'),
-            workType: EMPLOYMENT_TO_WORKTYPE[job.employmentType] || 'full-time',
-            salaryMin: null,
-            salaryMax: null,
-            url: job.applyUrl || job.jobUrl || '',
-            postedAt: job.publishedAt || null,
-            description,
-            skills: findSkillsInText(`${job.title} ${description}`).slice(0, 12),
-            isSampleData: false,
-            countryHint: job.address?.postalAddress?.addressCountry === 'United States' ? 'US'
-              : job.address?.postalAddress?.addressCountry === 'Canada' ? 'CA' : '',
+        return (data.jobs || [])
+          .filter((job) => job.isListed !== false)
+          .map((job) => {
+            const description = stripHtml(job.descriptionHtml || '').slice(0, 6000);
+            return {
+              id: `ashby:${board}:${job.id}`,
+              provider: 'ashby',
+              source: 'Ashby',
+              externalId: job.id,
+              title: job.title || 'Untitled role',
+              company: prettyCompanyName(board),
+              location: job.location || job.secondaryLocations?.[0]?.location || 'Not specified',
+              remote: WORKPLACE_TO_REMOTE[job.workplaceType] || (job.isRemote ? 'remote' : 'unknown'),
+              workType: EMPLOYMENT_TO_WORKTYPE[job.employmentType] || 'full-time',
+              salaryMin: null,
+              salaryMax: null,
+              url: job.applyUrl || job.jobUrl || '',
+              postedAt: job.publishedAt || null,
+              description,
+              skills: findSkillsInText(`${job.title} ${description}`).slice(0, 12),
+              isSampleData: false,
+              countryHint: job.address?.postalAddress?.addressCountry === 'United States' ? 'US'
+                : job.address?.postalAddress?.addressCountry === 'Canada' ? 'CA' : '',
+            };
           });
-        }
-      } catch (err) {
-        console.warn(`Ashby fetch failed for board "${board}":`, err.message);
-      }
+      })
+    );
+
+    const results = [];
+    for (const [i, s] of settled.entries()) {
+      if (s.status === 'fulfilled') results.push(...s.value);
+      else console.warn(`Ashby fetch failed for board "${boards[i]}":`, s.reason?.message);
     }
     return results;
   },

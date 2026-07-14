@@ -30,22 +30,23 @@ const leverProvider = {
       .map((c) => c.trim())
       .filter(Boolean);
 
-    const results = [];
-    for (const company of companies) {
-      try {
+    // Fetch every company concurrently — sequential awaits here would mean N
+    // companies pay N round-trips end-to-end instead of just the slowest one.
+    const settled = await Promise.allSettled(
+      companies.map(async (company) => {
         const res = await fetchWithTimeout(
           `https://api.lever.co/v0/postings/${encodeURIComponent(company)}?mode=json`,
           { timeoutMs: 8000 }
         );
         if (!res.ok) {
           console.warn(`Lever company "${company}" returned ${res.status}`);
-          continue;
+          return [];
         }
         const postings = await res.json();
-        for (const p of postings || []) {
+        return (postings || []).map((p) => {
           const description = toPlainText(p).slice(0, 6000);
           const workStyle = (p.workplaceType || '').toLowerCase();
-          results.push({
+          return {
             id: `lever:${company}:${p.id}`,
             provider: 'lever',
             source: 'Lever',
@@ -65,11 +66,15 @@ const leverProvider = {
             // ISO country code straight from the Lever API — authoritative
             // even when the display location is just "Hybrid"/"In-Office".
             countryHint: p.country || '',
-          });
-        }
-      } catch (err) {
-        console.warn(`Lever fetch failed for company "${company}":`, err.message);
-      }
+          };
+        });
+      })
+    );
+
+    const results = [];
+    for (const [i, s] of settled.entries()) {
+      if (s.status === 'fulfilled') results.push(...s.value);
+      else console.warn(`Lever fetch failed for company "${companies[i]}":`, s.reason?.message);
     }
     return results;
   },

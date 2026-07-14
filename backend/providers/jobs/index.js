@@ -66,11 +66,30 @@ export function usingSampleData() {
   return REAL_PROVIDERS.every((p) => !p.isConfigured());
 }
 
+// If two callers both see a stale/empty cache at the same moment (e.g. the
+// background warm-up racing a real request right after boot), they'd
+// otherwise each kick off a full multi-provider fetch. Sharing one in-flight
+// promise means the second caller just waits on the first's result.
+let inFlight = null;
+
 export async function fetchAllJobs({ force = false } = {}) {
   const now = Date.now();
   if (!force && cache.jobs.length > 0 && now - cache.at < CACHE_TTL_MS) {
     return cache.jobs;
   }
+  if (inFlight) return inFlight;
+
+  inFlight = (async () => {
+    try {
+      return await fetchAllJobsUncached();
+    } finally {
+      inFlight = null;
+    }
+  })();
+  return inFlight;
+}
+
+async function fetchAllJobsUncached() {
   const providers = activeProviders();
   // Each provider already times out its own upstream requests (see
   // fetchWithTimeout); allSettled means one provider failing entirely still
@@ -84,7 +103,7 @@ export async function fetchAllJobs({ force = false } = {}) {
   );
 
   if (jobs.length > 0) {
-    cache = { at: now, jobs };
+    cache = { at: Date.now(), jobs };
   }
   return jobs.length > 0 ? jobs : cache.jobs;
 }
@@ -94,4 +113,19 @@ export async function fetchAllJobs({ force = false } = {}) {
 export async function getJobById(id) {
   const jobs = await fetchAllJobs();
   return jobs.find((j) => j.id === id) || null;
+}
+
+// Without this, whichever user's request happens to land right after the
+// cache's 10-minute TTL expires pays the full cost of re-fetching all
+// providers synchronously (up to several seconds). Refreshing proactively in
+// the background means requests almost always hit an already-warm cache.
+let backgroundRefreshStarted = false;
+export function startBackgroundJobRefresh() {
+  if (backgroundRefreshStarted) return;
+  backgroundRefreshStarted = true;
+  fetchAllJobs({ force: true }).catch((err) => console.warn('Initial job cache warm-up failed:', err.message));
+  const REFRESH_INTERVAL_MS = CACHE_TTL_MS - 60 * 1000; // refresh just before the cache would expire
+  setInterval(() => {
+    fetchAllJobs({ force: true }).catch((err) => console.warn('Background job cache refresh failed:', err.message));
+  }, REFRESH_INTERVAL_MS);
 }

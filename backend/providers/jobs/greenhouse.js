@@ -32,21 +32,22 @@ const greenhouseProvider = {
       .map((b) => b.trim())
       .filter(Boolean);
 
-    const results = [];
-    for (const board of boards) {
-      try {
+    // Fetch every board concurrently — sequential awaits here would mean N
+    // boards pay N round-trips end-to-end instead of just the slowest one.
+    const settled = await Promise.allSettled(
+      boards.map(async (board) => {
         const res = await fetchWithTimeout(
           `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs?content=true`,
           { timeoutMs: 8000 }
         );
         if (!res.ok) {
           console.warn(`Greenhouse board "${board}" returned ${res.status}`);
-          continue;
+          return [];
         }
         const data = await res.json();
-        for (const job of data.jobs || []) {
+        return (data.jobs || []).map((job) => {
           const description = stripHtml(job.content || '').slice(0, 6000);
-          results.push({
+          return {
             id: `greenhouse:${board}:${job.id}`,
             provider: 'greenhouse',
             source: 'Greenhouse',
@@ -63,11 +64,15 @@ const greenhouseProvider = {
             description,
             skills: findSkillsInText(`${job.title} ${description}`).slice(0, 12),
             isSampleData: false,
-          });
-        }
-      } catch (err) {
-        console.warn(`Greenhouse fetch failed for board "${board}":`, err.message);
-      }
+          };
+        });
+      })
+    );
+
+    const results = [];
+    for (const [i, s] of settled.entries()) {
+      if (s.status === 'fulfilled') results.push(...s.value);
+      else console.warn(`Greenhouse fetch failed for board "${boards[i]}":`, s.reason?.message);
     }
     return results;
   },

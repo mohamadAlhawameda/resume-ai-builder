@@ -11,7 +11,7 @@ import SavedJob from '../models/SavedJob.js';
 import Notification from '../models/Notification.js';
 import CareerProfile from '../models/CareerProfile.js';
 import { fetchAllJobs, getJobById, usingSampleData } from '../providers/jobs/index.js';
-import { scoreJobForUser, summarizeSkillGaps } from '../utils/jobMatch.js';
+import { scoreJobForUser, buildMatchContext, summarizeSkillGaps } from '../utils/jobMatch.js';
 import { validateBody, jobPreferencesSchema } from '../utils/validate.js';
 import { sendJobAlertEmail, sendApplicationStatusEmail } from '../services/email.js';
 import { matchFamilies, adjacentFamilies } from '../utils/occupationTaxonomy.js';
@@ -104,12 +104,15 @@ router.get('/recommended', async (req, res) => {
     // signal. Return jobs unscored rather than show a misleading number.
     const hasProfile = (resumeData.experience?.length || 0) > 0 || (resumeData.skills?.length || 0) > 0;
 
-    let scored = hasProfile
-      ? jobs.map((job) => ({ ...job, match: scoreJobForUser(job, resumeData, prefs) }))
-      : jobs.map((job) => ({ ...job, match: null }));
-
+    let scored;
     if (hasProfile) {
-      await generateAlerts(user, scored).catch((e) => console.warn('Alert generation failed:', e.message));
+      const ctx = buildMatchContext(resumeData, prefs);
+      scored = jobs.map((job) => ({ ...job, match: scoreJobForUser(job, ctx) }));
+      // Fire-and-forget — alert bookkeeping shouldn't delay the response the
+      // client is waiting on.
+      generateAlerts(user, scored).catch((e) => console.warn('Alert generation failed:', e.message));
+    } else {
+      scored = jobs.map((job) => ({ ...job, match: null }));
     }
 
     // ---- Server-side search/filter so pagination is correct across the
@@ -337,7 +340,8 @@ router.get('/radar', async (req, res) => {
 
     const jobs = await fetchAllJobs();
     const prefs = user.jobPreferences?.toObject ? user.jobPreferences.toObject() : (user.jobPreferences || {});
-    const scored = jobs.map((job) => ({ ...job, match: scoreJobForUser(job, resumeData, prefs) }));
+    const ctx = buildMatchContext(resumeData, prefs);
+    const scored = jobs.map((job) => ({ ...job, match: scoreJobForUser(job, ctx) }));
 
     const qualifyNow = scored
       .filter((j) => j.match.percent >= 75)
@@ -417,9 +421,11 @@ router.post('/simulate', validateBody(simulateSchema), async (req, res) => {
     const jobs = await fetchAllJobs();
     const prefs = user.jobPreferences?.toObject ? user.jobPreferences.toObject() : (user.jobPreferences || {});
 
-    const before = jobs.map((j) => scoreJobForUser(j, resumeData, prefs));
+    const beforeCtx = buildMatchContext(resumeData, prefs);
+    const before = jobs.map((j) => scoreJobForUser(j, beforeCtx));
     const augmented = { ...resumeData, skills: [...(resumeData.skills || []), ...req.body.addSkills] };
-    const after = jobs.map((j) => scoreJobForUser(j, augmented, prefs));
+    const afterCtx = buildMatchContext(augmented, prefs);
+    const after = jobs.map((j) => scoreJobForUser(j, afterCtx));
 
     const avg = (arr) => (arr.length ? arr.reduce((s, x) => s + x.percent, 0) / arr.length : 0);
     const qualifyingCount = (arr, threshold = 75) => arr.filter((x) => x.percent >= threshold).length;

@@ -17,7 +17,7 @@ import generateRoutes from './routes/generate.js';
 import jobsRoutes from './routes/jobs.js';
 import notificationRoutes from './routes/notifications.js';
 import profileRoutes from './routes/profile.js';
-import { usingSampleData } from './providers/jobs/index.js';
+import { usingSampleData, startBackgroundJobRefresh } from './providers/jobs/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -79,6 +79,9 @@ mongoose
     if (usingSampleData()) {
       console.log('ℹ️  Job providers: using SAMPLE data (Remotive/Arbeitnow/The Muse unreachable or disabled — check REMOTIVE_ENABLED/ARBEITNOW_ENABLED/THEMUSE_ENABLED, or set GREENHOUSE_BOARDS/LEVER_COMPANIES/ASHBY_BOARDS)');
     }
+    // Warm the job cache now and keep refreshing it in the background so
+    // user requests never pay the cost of a live multi-provider fetch.
+    startBackgroundJobRefresh();
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
     });

@@ -298,32 +298,19 @@ export function matchResumeToJob(resumeData, jobDescription, jobTitle = '', jobM
 }
 
 /**
- * Score a provider job against resume + user preferences.
- * Returns { percent, matchedSkills, missingSkills, reasons } for job cards.
+ * Precompute everything about the resume + preferences that scoring needs —
+ * once per request — so scoring N jobs is O(N) cheap comparisons instead of
+ * O(N) full resume re-parses. Pass the result to `scoreJobForUser` for every
+ * job in the batch.
  */
-export function scoreJobForUser(job, resumeData, prefs = {}) {
+export function buildMatchContext(resumeData = {}, prefs = {}) {
   const resumeText = resumeToText(resumeData || {}).toLowerCase();
   const resumeSkills = new Set(findSkillsInText(resumeText).map((s) => s.toLowerCase()));
   const userSkills = new Set((prefs.skills || []).map((s) => s.toLowerCase()));
+  const userSeniority = seniorityRank((resumeData?.experience || [])[0]?.role || '');
 
-  const jobSkills = job.skills?.length
-    ? job.skills
-    : findSkillsInText(`${job.title} ${job.description}`);
-
-  const matchedSkills = jobSkills.filter(
-    (s) => resumeSkills.has(s.toLowerCase()) || userSkills.has(s.toLowerCase())
-  );
-  const missingSkills = jobSkills.filter((s) => !matchedSkills.includes(s));
-
-  const skillRatio = jobSkills.length ? matchedSkills.length / jobSkills.length : 0.4;
-
-  // Title preference overlap
-  const titles = prefs.titles || [];
-  const titleMatch = titles.some((t) =>
-    job.title.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(job.title.toLowerCase())
-  );
-  const roleWords = tokenize(titles.join(' '));
-  const partialTitle = roleWords.some((w) => job.title.toLowerCase().includes(w));
+  const titlesLower = (prefs.titles || []).map((t) => t.toLowerCase());
+  const roleWords = tokenize(titlesLower.join(' '));
 
   // Location preference — structured (countries/provinces-states/cities) is
   // the primary signal; legacy freeform `locations` tags are an additional
@@ -334,30 +321,71 @@ export function scoreJobForUser(job, resumeData, prefs = {}) {
   const wantedCities = prefs.cities || [];
   const hasStructuredLocationPrefs = wantedCountries.length > 0 || wantedRegions.length > 0 || wantedCities.length > 0;
 
+  // Remote/hybrid/onsite preference — multi-select (remoteTypes) takes
+  // priority; falls back to the legacy single-select `remote` field.
+  const remoteTypes = prefs.remoteTypes?.length > 0 ? prefs.remoteTypes : prefs.remote && prefs.remote !== 'any' ? [prefs.remote] : [];
+
+  return {
+    resumeSkills,
+    userSkills,
+    userSeniority,
+    titlesLower,
+    roleWords,
+    legacyLocations,
+    wantedCountries,
+    wantedRegions,
+    wantedCities,
+    hasStructuredLocationPrefs,
+    remoteTypes,
+    workType: prefs.workType,
+    salaryMin: prefs.salaryMin,
+  };
+}
+
+/**
+ * Score a provider job against a precomputed match context (see
+ * `buildMatchContext`). Returns { percent, matchedSkills, missingSkills,
+ * reasons } for job cards.
+ */
+export function scoreJobForUser(job, ctx) {
+  const jobSkills = job.skills?.length
+    ? job.skills
+    : findSkillsInText(`${job.title} ${job.description}`);
+  const jobTitleLower = job.title.toLowerCase();
+
+  const matchedSkills = jobSkills.filter((s) => {
+    const sLower = s.toLowerCase();
+    return ctx.resumeSkills.has(sLower) || ctx.userSkills.has(sLower);
+  });
+  const missingSkills = jobSkills.filter((s) => !matchedSkills.includes(s));
+
+  const skillRatio = jobSkills.length ? matchedSkills.length / jobSkills.length : 0.4;
+
+  // Title preference overlap
+  const titleMatch = ctx.titlesLower.some((t) => jobTitleLower.includes(t) || t.includes(jobTitleLower));
+  const partialTitle = ctx.roleWords.some((w) => jobTitleLower.includes(w));
+
   let locationMatch;
-  if (hasStructuredLocationPrefs) {
-    const countryMatch = wantedCountries.length === 0 || wantedCountries.some((c) => (job.countries || []).includes(c));
-    const regionMatch = wantedRegions.length === 0 || wantedRegions.some((r) => (job.regions || []).includes(r));
-    const cityMatch = wantedCities.length === 0 || wantedCities.some((c) => job.location.toLowerCase().includes(c.toLowerCase()));
+  if (ctx.hasStructuredLocationPrefs) {
+    const countryMatch = ctx.wantedCountries.length === 0 || ctx.wantedCountries.some((c) => (job.countries || []).includes(c));
+    const regionMatch = ctx.wantedRegions.length === 0 || ctx.wantedRegions.some((r) => (job.regions || []).includes(r));
+    const cityMatch = ctx.wantedCities.length === 0 || ctx.wantedCities.some((c) => job.location.toLowerCase().includes(c.toLowerCase()));
     locationMatch = countryMatch && regionMatch && cityMatch;
   } else {
     locationMatch =
       job.remote === 'remote' ||
-      legacyLocations.length === 0 ||
-      legacyLocations.some((l) => job.location.toLowerCase().includes(l.toLowerCase()));
+      ctx.legacyLocations.length === 0 ||
+      ctx.legacyLocations.some((l) => job.location.toLowerCase().includes(l.toLowerCase()));
   }
 
-  // Remote/hybrid/onsite preference — multi-select (remoteTypes) takes
-  // priority; falls back to the legacy single-select `remote` field.
-  const remoteTypes = prefs.remoteTypes?.length > 0 ? prefs.remoteTypes : prefs.remote && prefs.remote !== 'any' ? [prefs.remote] : [];
-  const remoteOk = remoteTypes.length === 0 || job.remote === 'unknown' || remoteTypes.includes(job.remote);
+  const remoteOk = ctx.remoteTypes.length === 0 || job.remote === 'unknown' || ctx.remoteTypes.includes(job.remote);
 
   const workTypeOk =
-    !prefs.workType || prefs.workType === 'any' || !job.workType ||
-    job.workType.toLowerCase().replace(/\s/g, '-') === prefs.workType;
+    !ctx.workType || ctx.workType === 'any' || !job.workType ||
+    job.workType.toLowerCase().replace(/\s/g, '-') === ctx.workType;
 
   const salaryOk =
-    !prefs.salaryMin || !job.salaryMax || job.salaryMax >= prefs.salaryMin;
+    !ctx.salaryMin || !job.salaryMax || job.salaryMax >= ctx.salaryMin;
 
   let percent =
     skillRatio * 55 +
@@ -372,8 +400,8 @@ export function scoreJobForUser(job, resumeData, prefs = {}) {
   if (matchedSkills.length) reasons.push(`You match ${matchedSkills.length}/${jobSkills.length} required skills.`);
   if (titleMatch) reasons.push('Job title matches your preferred roles.');
   else if (partialTitle) reasons.push('Job title partially matches your preferred roles.');
-  if (job.remote === 'remote' && remoteTypes.includes('remote')) reasons.push('Remote role, matching your preference.');
-  if (locationMatch && (hasStructuredLocationPrefs || legacyLocations.length > 0) && job.remote !== 'remote') {
+  if (job.remote === 'remote' && ctx.remoteTypes.includes('remote')) reasons.push('Remote role, matching your preference.');
+  if (locationMatch && (ctx.hasStructuredLocationPrefs || ctx.legacyLocations.length > 0) && job.remote !== 'remote') {
     reasons.push('Located in one of your preferred areas.');
   }
   if (!salaryOk) reasons.push('Salary may be below your minimum.');
@@ -386,7 +414,7 @@ export function scoreJobForUser(job, resumeData, prefs = {}) {
     reasons: reasons.slice(0, 4),
     subScores: {
       skills: clampScore(skillRatio * 100),
-      seniority: clampScore(100 - Math.abs(seniorityRank(job.title) - seniorityRank((resumeData?.experience || [])[0]?.role || '')) * 20),
+      seniority: clampScore(100 - Math.abs(seniorityRank(job.title) - ctx.userSeniority) * 20),
       location: clampScore(locationMatch ? 100 : 40),
       remote: clampScore(remoteOk ? 100 : 35),
       salary: clampScore(salaryOk ? 100 : 45),
