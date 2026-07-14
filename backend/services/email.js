@@ -7,6 +7,7 @@
 // at myaccount.google.com/apppasswords; your normal password will not work>.
 
 import nodemailer from 'nodemailer';
+import { emailLayout, ctaButton, infoCard, bulletList, paragraph, heading, escapeHtml } from './emailTemplates.js';
 
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT, 10) || 587;
@@ -29,13 +30,16 @@ function getTransporter() {
   return transporter;
 }
 
-export async function sendEmail({ to, subject, text }) {
+// Every email is sent multipart (text + html) — text is the fallback for
+// clients that don't render HTML and helps deliverability/spam scoring;
+// html is the branded, professional version most recipients actually see.
+export async function sendEmail({ to, subject, text, html }) {
   if (!emailEnabled()) {
     console.log(`📧 [email disabled] Would send to ${to}: ${subject}`);
     return { sent: false, reason: 'email not configured (SMTP_HOST/SMTP_USER/SMTP_PASS)' };
   }
   try {
-    await getTransporter().sendMail({ from: FROM, to, subject, text });
+    await getTransporter().sendMail({ from: FROM, to, subject, text, html });
     return { sent: true };
   } catch (err) {
     console.warn('Email send failed:', err.message);
@@ -46,6 +50,24 @@ export async function sendEmail({ to, subject, text }) {
 const APP_URL = process.env.APP_URL || 'https://your-app-url';
 
 export async function sendWelcomeEmail(user) {
+  const name = escapeHtml(user.name || 'there');
+  const html = emailLayout({
+    preheader: "Here's how to get the most out of Rolevant AI.",
+    title: 'Welcome to Rolevant AI',
+    bodyHtml: `
+      ${heading(`Welcome, ${user.name || 'there'} 🎉`)}
+      ${paragraph(`Hi ${name}, welcome to Rolevant AI! Here's how to get the most out of it:`)}
+      ${bulletList([
+        'Upload your existing resume (PDF or DOCX) — we’ll parse and score it instantly.',
+        'Review your score and apply the top fixes.',
+        'Check Job Discovery for live US & Canada postings matched to your resume.',
+        'Turn on job alerts to get notified when a strong match appears.',
+        'Use the AI tools for cover letters, interview prep, and outreach messages.',
+      ])}
+      ${ctaButton('Get started', `${APP_URL}/analyze`)}
+    `,
+    footerNote: "You're receiving this because you created a Rolevant AI account.",
+  });
   return sendEmail({
     to: user.email,
     subject: 'Welcome to Rolevant AI 🎉',
@@ -62,10 +84,29 @@ Welcome to Rolevant AI! Here's how to get the most out of it:
 Get started: ${APP_URL}/analyze
 
 — The Rolevant AI team`,
+    html,
   });
 }
 
 export async function sendJobAlertEmail(user, job, matchPercent) {
+  const reasonText = (job.match?.reasons || []).slice(0, 2).join(' ') || 'Strong skill overlap with your resume.';
+  const html = emailLayout({
+    preheader: `"${job.title}" at ${job.company} matches your resume at ${matchPercent}%.`,
+    title: 'New job match',
+    bodyHtml: `
+      ${heading(`New ${matchPercent}% job match`)}
+      ${paragraph(`Hi ${escapeHtml(user.name || 'there')}, <strong>${escapeHtml(job.title)}</strong> matches your resume.`)}
+      ${infoCard([
+        ['Company', job.company || '—'],
+        ['Location', job.location || '—'],
+        ['Match score', `${matchPercent}%`],
+      ])}
+      ${paragraph(`<span style="color:#64748b;">Matched because: ${escapeHtml(reasonText)}</span>`)}
+      ${ctaButton('View & apply', job.url || `${APP_URL}/jobs`)}
+      ${paragraph(`Want a tailored cover letter or interview prep for this role first? <a href="${escapeHtml(`${APP_URL}/jobs?tab=saved`)}" style="color:#2563eb; font-weight:600; text-decoration:none;">Open it in Rolevant AI</a>.`)}
+    `,
+    footerNote: `You're receiving this because email alerts are enabled in your <a href="${escapeHtml(`${APP_URL}/jobs?tab=preferences`)}" style="color:#64748b;">job preferences</a>.`,
+  });
   return sendEmail({
     to: user.email,
     subject: `New ${matchPercent}% job match: ${job.title} at ${job.company}`,
@@ -73,7 +114,7 @@ export async function sendJobAlertEmail(user, job, matchPercent) {
 
 "${job.title}" at ${job.company} (${job.location}) matches your resume at ${matchPercent}%.
 
-Matched because: ${(job.match?.reasons || []).slice(0, 2).join(' ') || 'strong skill overlap with your resume.'}
+Matched because: ${reasonText}
 
 Apply directly: ${job.url || `${APP_URL}/jobs`}
 Prep for it (match report, cover letter, interview questions): ${APP_URL}/jobs?tab=saved
@@ -81,6 +122,7 @@ Prep for it (match report, cover letter, interview questions): ${APP_URL}/jobs?t
 You're receiving this because email alerts are enabled in your job preferences (${APP_URL}/jobs?tab=preferences).
 
 — Rolevant AI`,
+    html,
   });
 }
 
@@ -89,7 +131,13 @@ export async function sendApplicationStatusEmail(user, savedJob, status) {
   const messages = {
     applied: {
       subject: `Application sent: ${title} at ${company} ✅`,
-      body: `Nice work applying to "${title}" at ${company}!
+      heading: 'Application sent ✅',
+      intro: `Nice work applying to <strong>${escapeHtml(title)}</strong> at ${escapeHtml(company)}!`,
+      steps: [
+        { text: 'Generate a follow-up email', url: `${APP_URL}/tools?tool=follow-up-email`, suffix: ' if there’s no reply after ~7 days.' },
+        { text: 'Start interview prep', url: `${APP_URL}/tools?tool=interview-prep`, suffix: ' now, before you need it.' },
+      ],
+      text: `Nice work applying to "${title}" at ${company}!
 
 Suggested next steps:
 - No reply after ~7 days? Generate a follow-up email: ${APP_URL}/tools?tool=follow-up-email
@@ -97,7 +145,13 @@ Suggested next steps:
     },
     interviewing: {
       subject: `Interview stage: ${title} at ${company} 🎤`,
-      body: `You're interviewing for "${title}" at ${company} — great progress!
+      heading: 'Interview stage 🎤',
+      intro: `You're interviewing for <strong>${escapeHtml(title)}</strong> at ${escapeHtml(company)} — great progress!`,
+      steps: [
+        { text: 'Practice likely questions', url: `${APP_URL}/tools?tool=interview-prep`, suffix: ' with STAR-method hints.' },
+        { text: 'Send a thank-you note', url: `${APP_URL}/tools?tool=thank-you-email`, suffix: ' right after the interview.' },
+      ],
+      text: `You're interviewing for "${title}" at ${company} — great progress!
 
 Get ready:
 - Practice likely questions with STAR hints: ${APP_URL}/tools?tool=interview-prep
@@ -105,14 +159,31 @@ Get ready:
     },
     offer: {
       subject: `Offer received: ${title} at ${company} 🎉`,
-      body: `Congratulations on your offer from ${company}! Take a moment to celebrate — you earned it.`,
+      heading: 'Offer received 🎉',
+      intro: `Congratulations on your offer from <strong>${escapeHtml(company)}</strong>! Take a moment to celebrate — you earned it.`,
+      steps: [],
+      text: `Congratulations on your offer from ${company}! Take a moment to celebrate — you earned it.`,
     },
   };
   const msg = messages[status];
   if (!msg) return { sent: false, reason: 'no email for this status' };
+
+  const html = emailLayout({
+    preheader: msg.intro.replace(/<[^>]+>/g, ''),
+    title: msg.heading,
+    bodyHtml: `
+      ${heading(msg.heading)}
+      ${paragraph(`Hi ${escapeHtml(user.name || 'there')},`)}
+      ${paragraph(msg.intro)}
+      ${msg.steps.length ? bulletList(msg.steps) : ''}
+    `,
+    footerNote: `You're receiving this because email alerts are enabled in your <a href="${escapeHtml(`${APP_URL}/jobs?tab=preferences`)}" style="color:#64748b;">job preferences</a>.`,
+  });
+
   return sendEmail({
     to: user.email,
     subject: msg.subject,
-    text: `Hi ${user.name},\n\n${msg.body}\n\n— Rolevant AI`,
+    text: `Hi ${user.name},\n\n${msg.text}\n\n— Rolevant AI`,
+    html,
   });
 }

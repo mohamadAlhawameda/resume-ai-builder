@@ -9,20 +9,7 @@
 // pulling their entire catalog on every cache refresh.
 import { findSkillsInText } from '../../utils/text.js';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout.js';
-
-function stripHtml(html = '') {
-  return html
-    .replace(/<br\s*\/?>(\s*)/gi, '\n')
-    .replace(/<\/(p|li|div|h[1-6])>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '- ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#?\w+;/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
+import { stripHtml } from '../../utils/htmlToText.js';
 
 const PAGES_TO_FETCH = 3;
 

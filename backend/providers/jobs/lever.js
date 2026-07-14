@@ -7,15 +7,15 @@
 import { findSkillsInText } from '../../utils/text.js';
 import { prettyCompanyName } from './companyName.js';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout.js';
+import { stripHtml } from '../../utils/htmlToText.js';
 
 function toPlainText(posting) {
+  // descriptionPlain/list.text are already plain text from Lever's API;
+  // list.content is real (single-encoded) HTML and needs stripping.
   const parts = [posting.descriptionPlain || ''];
   for (const list of posting.lists || []) {
     parts.push(list.text || '');
-    const items = (list.content || '')
-      .replace(/<li[^>]*>/gi, '\n- ')
-      .replace(/<[^>]+>/g, '');
-    parts.push(items);
+    parts.push(stripHtml(list.content || ''));
   }
   return parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

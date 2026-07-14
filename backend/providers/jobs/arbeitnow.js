@@ -12,20 +12,7 @@
 // Set JOB_COUNTRIES=all to see its full (mostly European) breadth.
 import { findSkillsInText } from '../../utils/text.js';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout.js';
-
-function stripHtml(html = '') {
-  return html
-    .replace(/<br\s*\/?>(\s*)/gi, '\n')
-    .replace(/<\/(p|li|div|h[1-6])>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '- ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#?\w+;/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
+import { stripHtml } from '../../utils/htmlToText.js';
 
 function mapWorkType(jobTypes = []) {
   const s = jobTypes.join(' ').toLowerCase();
