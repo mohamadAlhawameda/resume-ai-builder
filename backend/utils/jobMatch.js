@@ -325,15 +325,32 @@ export function scoreJobForUser(job, resumeData, prefs = {}) {
   const roleWords = tokenize(titles.join(' '));
   const partialTitle = roleWords.some((w) => job.title.toLowerCase().includes(w));
 
-  // Location / remote preference
-  const locations = prefs.locations || [];
-  const locationMatch =
-    job.remote === 'remote' ||
-    locations.length === 0 ||
-    locations.some((l) => job.location.toLowerCase().includes(l.toLowerCase()));
+  // Location preference — structured (countries/provinces-states/cities) is
+  // the primary signal; legacy freeform `locations` tags are an additional
+  // fallback for users who haven't migrated to the structured picker yet.
+  const legacyLocations = prefs.locations || [];
+  const wantedCountries = prefs.countries || [];
+  const wantedRegions = [...(prefs.caProvinces || []), ...(prefs.usStates || [])];
+  const wantedCities = prefs.cities || [];
+  const hasStructuredLocationPrefs = wantedCountries.length > 0 || wantedRegions.length > 0 || wantedCities.length > 0;
 
-  const remoteOk =
-    !prefs.remote || prefs.remote === 'any' || job.remote === 'unknown' || job.remote === prefs.remote;
+  let locationMatch;
+  if (hasStructuredLocationPrefs) {
+    const countryMatch = wantedCountries.length === 0 || wantedCountries.some((c) => (job.countries || []).includes(c));
+    const regionMatch = wantedRegions.length === 0 || wantedRegions.some((r) => (job.regions || []).includes(r));
+    const cityMatch = wantedCities.length === 0 || wantedCities.some((c) => job.location.toLowerCase().includes(c.toLowerCase()));
+    locationMatch = countryMatch && regionMatch && cityMatch;
+  } else {
+    locationMatch =
+      job.remote === 'remote' ||
+      legacyLocations.length === 0 ||
+      legacyLocations.some((l) => job.location.toLowerCase().includes(l.toLowerCase()));
+  }
+
+  // Remote/hybrid/onsite preference — multi-select (remoteTypes) takes
+  // priority; falls back to the legacy single-select `remote` field.
+  const remoteTypes = prefs.remoteTypes?.length > 0 ? prefs.remoteTypes : prefs.remote && prefs.remote !== 'any' ? [prefs.remote] : [];
+  const remoteOk = remoteTypes.length === 0 || job.remote === 'unknown' || remoteTypes.includes(job.remote);
 
   const workTypeOk =
     !prefs.workType || prefs.workType === 'any' || !job.workType ||
@@ -355,8 +372,10 @@ export function scoreJobForUser(job, resumeData, prefs = {}) {
   if (matchedSkills.length) reasons.push(`You match ${matchedSkills.length}/${jobSkills.length} required skills.`);
   if (titleMatch) reasons.push('Job title matches your preferred roles.');
   else if (partialTitle) reasons.push('Job title partially matches your preferred roles.');
-  if (job.remote === 'remote' && prefs.remote === 'remote') reasons.push('Remote role, matching your preference.');
-  if (locationMatch && locations.length > 0 && job.remote !== 'remote') reasons.push('Located in one of your preferred areas.');
+  if (job.remote === 'remote' && remoteTypes.includes('remote')) reasons.push('Remote role, matching your preference.');
+  if (locationMatch && (hasStructuredLocationPrefs || legacyLocations.length > 0) && job.remote !== 'remote') {
+    reasons.push('Located in one of your preferred areas.');
+  }
   if (!salaryOk) reasons.push('Salary may be below your minimum.');
   if (missingSkills.length) reasons.push(`Missing from your resume: ${missingSkills.slice(0, 4).join(', ')}.`);
 

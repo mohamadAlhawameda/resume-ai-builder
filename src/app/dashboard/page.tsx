@@ -25,6 +25,7 @@ import { scoreColor } from '@/components/ui/ScoreRing';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getUser, isLoggedIn, type StoredUser } from '@/lib/auth';
 import type { ResumeRecord, ScanHistoryItem, SavedJob, Job, NextAction } from '@/lib/types';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 interface Profile {
   targetRole: string;
@@ -33,6 +34,7 @@ interface Profile {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t, formatDate } = useLocale();
   const [user, setUser] = useState<StoredUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
@@ -74,25 +76,26 @@ export default function DashboardPage() {
       }
       if (results[5].status === 'fulfilled') setNextAction(results[5].value);
       if (results[0].status === 'rejected') {
-        toast.error(apiErrorMessage(results[0].reason, 'Could not load your resumes.'));
+        toast.error(apiErrorMessage(results[0].reason, t('dashboardPage.toastLoadResumesError')));
       }
       setLoading(false);
     };
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const saveProfile = useCallback(async () => {
     setSavingProfile(true);
     try {
       await api('/auth/profile', { method: 'PUT', body: profile });
-      toast.success('Career target updated');
+      toast.success(t('dashboardPage.toastTargetUpdated'));
       setEditingTarget(false);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
       setSavingProfile(false);
     }
-  }, [profile]);
+  }, [profile, t]);
 
   const scans = history.filter((h) => h.type === 'scan' && typeof h.overall === 'number');
   const latestScore = scans[0]?.overall ?? null;
@@ -102,29 +105,29 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      label: 'Resumes',
+      label: t('dashboardPage.statResumes'),
       value: resumes.length,
       icon: FileText,
       href: '/resumes',
       color: 'from-blue-500 to-indigo-600 shadow-blue-600/25',
     },
     {
-      label: 'Latest score',
+      label: t('dashboardPage.statLatestScore'),
       value: latestScore !== null ? `${latestScore}/100` : '—',
-      sub: scoreDelta !== null ? `${scoreDelta >= 0 ? '+' : ''}${scoreDelta} vs previous` : undefined,
+      sub: scoreDelta !== null ? t('dashboardPage.vsPrevious', { delta: `${scoreDelta >= 0 ? '+' : ''}${scoreDelta}` }) : undefined,
       icon: ScanSearch,
       href: '/analyze',
       color: 'from-violet-500 to-purple-600 shadow-purple-600/25',
     },
     {
-      label: 'Saved jobs',
+      label: t('dashboardPage.statSavedJobs'),
       value: savedJobs.length,
       icon: Briefcase,
       href: '/jobs?tab=saved',
       color: 'from-emerald-500 to-teal-600 shadow-emerald-600/25',
     },
     {
-      label: 'Applications',
+      label: t('dashboardPage.statApplications'),
       value: applications,
       icon: ClipboardList,
       href: '/jobs?tab=saved',
@@ -134,20 +137,20 @@ export default function DashboardPage() {
 
   const recommendations: { text: string; href: string }[] = [];
   if (!profile.targetRole) {
-    recommendations.push({ text: 'Set your target role so scans and job matches can be personalized.', href: '#target' });
+    recommendations.push({ text: t('dashboardPage.recTargetRole'), href: '#target' });
   }
   if (resumes.length === 0) {
-    recommendations.push({ text: 'Create your first resume — it takes about 10 minutes with AI help.', href: '/resume' });
+    recommendations.push({ text: t('dashboardPage.recFirstResume'), href: '/resume' });
   } else if (scans.length === 0) {
-    recommendations.push({ text: 'Run your first resume scan to get an ATS score and improvement plan.', href: '/analyze' });
+    recommendations.push({ text: t('dashboardPage.recFirstScan'), href: '/analyze' });
   } else if (latestScore !== null && latestScore < 75) {
-    recommendations.push({ text: `Your latest score is ${latestScore}/100 — apply the top fixes to push it above 75.`, href: '/analyze' });
+    recommendations.push({ text: t('dashboardPage.recImproveScore', { score: latestScore }), href: '/analyze' });
   }
   if (resumes.length > 0 && savedJobs.length === 0) {
-    recommendations.push({ text: 'Browse recommended jobs and save the ones worth pursuing.', href: '/jobs' });
+    recommendations.push({ text: t('dashboardPage.recBrowseJobs'), href: '/jobs' });
   }
   if (resumes.length === 1) {
-    recommendations.push({ text: 'Duplicate your resume to tailor a version for each job family you target.', href: '/resumes' });
+    recommendations.push({ text: t('dashboardPage.recDuplicateResume'), href: '/resumes' });
   }
 
   if (loading) {
@@ -178,20 +181,22 @@ export default function DashboardPage() {
       >
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-            Welcome back, {user?.name?.split(' ')[0] || 'there'} 👋
+            {t('dashboardPage.welcomeBack', { name: user?.name?.split(' ')[0] || t('dashboardPage.thereFallback') })}
           </h1>
           <p className="text-slate-500 mt-1 text-sm sm:text-base">
             {profile.targetRole
-              ? `Working toward: ${profile.targetRole}${profile.industry ? ` · ${profile.industry}` : ''}`
-              : 'Here is your career progress at a glance.'}
+              ? profile.industry
+                ? t('dashboardPage.workingTowardWithIndustry', { role: profile.targetRole, industry: profile.industry })
+                : t('dashboardPage.workingToward', { role: profile.targetRole })
+              : t('dashboardPage.progressAtGlance')}
           </p>
         </div>
         <div className="flex gap-2">
           <Button icon={<ScanSearch className="w-4 h-4" />} variant="outline" onClick={() => router.push('/analyze')}>
-            Scan resume
+            {t('dashboardPage.scanResume')}
           </Button>
           <Button icon={<FilePlus2 className="w-4 h-4" />} onClick={() => router.push('/resume')}>
-            New resume
+            {t('dashboardPage.newResume')}
           </Button>
         </div>
       </motion.div>
@@ -205,7 +210,7 @@ export default function DashboardPage() {
             </span>
             <p className="text-sm text-white flex-1">{nextAction.action}</p>
             <Button size="sm" variant="outline" className="shrink-0" onClick={() => router.push(nextAction.href)}>
-              Go <ArrowRight className="w-3.5 h-3.5" />
+              {t('dashboardPage.go')} <ArrowRight className="w-3.5 h-3.5" />
             </Button>
           </div>
         </motion.div>
@@ -244,17 +249,17 @@ export default function DashboardPage() {
           {/* Recent resumes */}
           <Card padded={false}>
             <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">Your resumes</h2>
+              <h2 className="font-semibold text-slate-900">{t('dashboardPage.yourResumes')}</h2>
               <Link href="/resumes" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
-                View all <ArrowRight className="w-3.5 h-3.5" />
+                {t('dashboardPage.viewAll')} <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
             {resumes.length === 0 ? (
               <EmptyState
                 icon={<FileText className="w-6 h-6" />}
-                title="No resumes yet"
-                description="Create your first resume and let AI help you write it."
-                action={<Button onClick={() => router.push('/resume')}>Create resume</Button>}
+                title={t('dashboardPage.noResumesTitle')}
+                description={t('dashboardPage.noResumesDescription')}
+                action={<Button onClick={() => router.push('/resume')}>{t('dashboardPage.createResume')}</Button>}
               />
             ) : (
               <ul className="divide-y divide-slate-50">
@@ -265,11 +270,11 @@ export default function DashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-slate-900 truncate">
-                        {r.title || r.data?.fullName || 'Untitled resume'}
+                        {r.title || r.data?.fullName || t('dashboardPage.untitledResume')}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Updated {new Date(r.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        {r.templateId && ` · ${r.templateId} template`}
+                        {t('dashboardPage.updatedOn', { date: formatDate(r.updatedAt) })}
+                        {r.templateId && ` · ${t('dashboardPage.templateSuffix', { template: r.templateId })}`}
                       </p>
                     </div>
                     {typeof (r as ResumeRecord & { lastScore?: number }).lastScore === 'number' && (
@@ -278,7 +283,7 @@ export default function DashboardPage() {
                       </Badge>
                     )}
                     <Button size="sm" variant="outline" onClick={() => router.push(`/resume/edit/${r._id}`)}>
-                      Edit
+                      {t('dashboardPage.edit')}
                     </Button>
                   </li>
                 ))}
@@ -290,23 +295,23 @@ export default function DashboardPage() {
           <Card padded={false}>
             <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100">
               <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-purple-500" aria-hidden /> Score progress
+                <TrendingUp className="w-4 h-4 text-purple-500" aria-hidden /> {t('dashboardPage.scoreProgress')}
               </h2>
               <Link href="/analyze" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
-                New scan <ArrowRight className="w-3.5 h-3.5" />
+                {t('dashboardPage.newScan')} <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
             {scans.length === 0 ? (
               <EmptyState
                 icon={<ScanSearch className="w-6 h-6" />}
-                title="No scans yet"
-                description="Scan your resume to get a score out of 100 across 9 categories, with fixes for each."
-                action={<Button variant="outline" onClick={() => router.push('/analyze')}>Run first scan</Button>}
+                title={t('dashboardPage.noScansTitle')}
+                description={t('dashboardPage.noScansDescription')}
+                action={<Button variant="outline" onClick={() => router.push('/analyze')}>{t('dashboardPage.runFirstScan')}</Button>}
               />
             ) : (
               <div className="px-5 sm:px-6 py-5">
                 {/* Simple score trend bars (oldest → newest) */}
-                <div className="flex items-end gap-1.5 h-24 mb-4" role="img" aria-label="Score history chart">
+                <div className="flex items-end gap-1.5 h-24 mb-4" role="img" aria-label={t('dashboardPage.scoreHistoryChart')}>
                   {[...scans].reverse().slice(-12).map((s, i) => (
                     <div key={s._id || i} className="flex-1 flex flex-col items-center gap-1 group relative">
                       <div
@@ -327,14 +332,18 @@ export default function DashboardPage() {
                   {history.slice(0, 4).map((h) => (
                     <li key={h._id} className="flex items-center justify-between text-sm">
                       <span className="text-slate-600 truncate">
-                        {h.type === 'scan' ? 'Resume scan' : `Job match${h.jobTitle ? ` — ${h.jobTitle}` : ''}`}
+                        {h.type === 'scan'
+                          ? t('dashboardPage.resumeScanLabel')
+                          : h.jobTitle
+                            ? t('dashboardPage.jobMatchLabelWithTitle', { title: h.jobTitle })
+                            : t('dashboardPage.jobMatchLabel')}
                       </span>
                       <span className="flex items-center gap-3 shrink-0">
                         <Badge tone={scoreTone(h.overall ?? h.matchPercent ?? 0)}>
-                          {h.type === 'scan' ? `${h.overall}/100` : `${h.matchPercent}% match`}
+                          {h.type === 'scan' ? `${h.overall}/100` : t('dashboardPage.matchPercent', { n: h.matchPercent ?? 0 })}
                         </Badge>
                         <span className="text-xs text-slate-400 w-16 text-right">
-                          {new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          {formatDate(h.createdAt)}
                         </span>
                       </span>
                     </li>
@@ -350,40 +359,40 @@ export default function DashboardPage() {
           {/* Career target */}
           <Card id="target">
             <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-3">
-              <Target className="w-4 h-4 text-blue-500" aria-hidden /> Career target
+              <Target className="w-4 h-4 text-blue-500" aria-hidden /> {t('dashboardPage.careerTarget')}
             </h2>
             {editingTarget ? (
               <div className="space-y-3">
                 <div>
                   <label htmlFor="targetRole" className="block text-xs font-medium text-slate-600 mb-1">
-                    Target role
+                    {t('dashboardPage.targetRoleLabel')}
                   </label>
                   <input
                     id="targetRole"
                     value={profile.targetRole}
                     onChange={(e) => setProfile((p) => ({ ...p, targetRole: e.target.value }))}
-                    placeholder="e.g. Frontend Developer"
+                    placeholder={t('dashboardPage.targetRolePlaceholder')}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label htmlFor="industry" className="block text-xs font-medium text-slate-600 mb-1">
-                    Industry
+                    {t('dashboardPage.industryLabel')}
                   </label>
                   <input
                     id="industry"
                     value={profile.industry}
                     onChange={(e) => setProfile((p) => ({ ...p, industry: e.target.value }))}
-                    placeholder="e.g. Fintech"
+                    placeholder={t('dashboardPage.industryPlaceholder')}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" loading={savingProfile} onClick={saveProfile}>
-                    Save
+                    {t('dashboardPage.save')}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditingTarget(false)}>
-                    Cancel
+                    {t('dashboardPage.cancel')}
                   </Button>
                 </div>
               </div>
@@ -395,12 +404,10 @@ export default function DashboardPage() {
                     {profile.industry && <span className="text-slate-500"> · {profile.industry}</span>}
                   </p>
                 ) : (
-                  <p className="text-sm text-slate-500">
-                    Not set — recommendations and job matching work best with a target.
-                  </p>
+                  <p className="text-sm text-slate-500">{t('dashboardPage.targetNotSet')}</p>
                 )}
                 <Button size="sm" variant="outline" className="mt-3" onClick={() => setEditingTarget(true)}>
-                  {profile.targetRole ? 'Edit' : 'Set target'}
+                  {profile.targetRole ? t('dashboardPage.edit') : t('dashboardPage.setTarget')}
                 </Button>
               </div>
             )}
@@ -410,7 +417,7 @@ export default function DashboardPage() {
           {recommendations.length > 0 && (
             <Card>
               <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-amber-500" aria-hidden /> Recommended next steps
+                <Sparkles className="w-4 h-4 text-amber-500" aria-hidden /> {t('dashboardPage.recommendedNextSteps')}
               </h2>
               <ul className="space-y-2.5">
                 {recommendations.slice(0, 4).map((rec, i) => (
@@ -431,15 +438,13 @@ export default function DashboardPage() {
           {/* Top job matches */}
           <Card padded={false}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">Top job matches</h2>
+              <h2 className="font-semibold text-slate-900">{t('dashboardPage.topJobMatches')}</h2>
               <Link href="/jobs" className="text-sm font-medium text-blue-600 hover:underline">
-                All jobs
+                {t('dashboardPage.allJobs')}
               </Link>
             </div>
             {topJobs.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-slate-500">
-                Job matches appear once you have a resume saved.
-              </p>
+              <p className="px-5 py-6 text-sm text-slate-500">{t('dashboardPage.jobMatchesEmpty')}</p>
             ) : (
               <ul className="divide-y divide-slate-50">
                 {topJobs.map((job) => (

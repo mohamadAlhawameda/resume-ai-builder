@@ -28,8 +28,15 @@ import Badge, { scoreTone } from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import TagInput from '@/components/ui/TagInput';
+import MultiSelect from '@/components/ui/MultiSelect';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
+import {
+  COUNTRY_OPTIONS,
+  CA_PROVINCE_OPTIONS,
+  US_STATE_OPTIONS,
+  WORK_STYLE_OPTIONS,
+} from '@/lib/locationData';
 import {
   DEFAULT_JOB_PREFERENCES,
   type Job,
@@ -37,22 +44,33 @@ import {
   type SavedJob,
   type SavedJobStatus,
 } from '@/lib/types';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 type Tab = 'recommended' | 'saved' | 'preferences';
 
-const CA_PROVINCES = new Set([
-  'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador',
-  'Nova Scotia', 'Northwest Territories', 'Nunavut', 'Ontario', 'Prince Edward Island',
-  'Quebec', 'Saskatchewan', 'Yukon',
-]);
 
-const STATUS_OPTIONS: { value: SavedJobStatus; label: string; tone: 'slate' | 'blue' | 'purple' | 'green' | 'red' }[] = [
-  { value: 'saved', label: 'Saved', tone: 'slate' },
-  { value: 'applied', label: 'Applied', tone: 'blue' },
-  { value: 'interviewing', label: 'Interviewing', tone: 'purple' },
-  { value: 'offer', label: 'Offer 🎉', tone: 'green' },
-  { value: 'rejected', label: 'Rejected', tone: 'red' },
+const STATUS_OPTIONS: { value: SavedJobStatus; labelKey: string; tone: 'slate' | 'blue' | 'purple' | 'green' | 'red' }[] = [
+  { value: 'saved', labelKey: 'jobsPage.statusSaved', tone: 'slate' },
+  { value: 'applied', labelKey: 'jobsPage.statusApplied', tone: 'blue' },
+  { value: 'interviewing', labelKey: 'jobsPage.statusInterviewing', tone: 'purple' },
+  { value: 'offer', labelKey: 'jobsPage.statusOffer', tone: 'green' },
+  { value: 'rejected', labelKey: 'jobsPage.statusRejected', tone: 'red' },
 ];
+
+/** Compact page-number window with ellipses, e.g. 1 … 4 5 [6] 7 8 … 20. */
+function paginationWindow(current: number, total: number): (number | '…')[] {
+  const delta = 1;
+  const pages: (number | '…')[] = [];
+  const range: number[] = [];
+  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) range.push(i);
+
+  pages.push(1);
+  if (range[0] > 2) pages.push('…');
+  pages.push(...range);
+  if (range[range.length - 1] < total - 1) pages.push('…');
+  if (total > 1) pages.push(total);
+  return pages;
+}
 
 function salaryText(job: Job): string | null {
   if (!job.salaryMin && !job.salaryMax) return null;
@@ -61,104 +79,166 @@ function salaryText(job: Job): string | null {
   return fmt((job.salaryMin || job.salaryMax) as number);
 }
 
+const PAGE_SIZE = 10;
+
 function JobsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, formatDate } = useLocale();
   const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'recommended');
   const [loading, setLoading] = useState(true);
+  const [jobsLoading, setJobsLoading] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalMatched, setTotalMatched] = useState(0);
+  const [hasProfile, setHasProfile] = useState(true);
   const [sampleData, setSampleData] = useState(false);
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
   const [prefs, setPrefs] = useState<JobPreferences>({ ...DEFAULT_JOB_PREFERENCES });
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [descriptions, setDescriptions] = useState<Record<string, string>>({});
+  const [descriptionLoading, setDescriptionLoading] = useState<string | null>(null);
   const [busyJob, setBusyJob] = useState<string | null>(null);
 
-  // Filters
+  // Filters — applied server-side so pagination stays correct across the
+  // whole matched set, not just whatever page happens to be loaded.
   const [query, setQuery] = useState('');
+  const [queryDebounced, setQueryDebounced] = useState('');
   const [remoteFilter, setRemoteFilter] = useState('any');
   const [countryFilter, setCountryFilter] = useState<'any' | 'CA' | 'US'>('any');
   const [regionFilter, setRegionFilter] = useState('any');
   const [minMatch, setMinMatch] = useState(0);
   const [sortBy, setSortBy] = useState<'match' | 'date' | 'salary'>('match');
 
-  const load = useCallback(async () => {
-    const [recRes, savedRes] = await Promise.allSettled([
-      api<{ jobs: Job[]; totalMatched?: number; sampleData: boolean; resumeId: string | null; preferences: Partial<JobPreferences> }>(
-        '/jobs/recommended'
-      ),
-      api<SavedJob[]>('/jobs/saved'),
-    ]);
-    if (recRes.status === 'fulfilled') {
-      setJobs(recRes.value.jobs || []);
-      setTotalMatched(recRes.value.totalMatched ?? (recRes.value.jobs || []).length);
-      setSampleData(!!recRes.value.sampleData);
-      setResumeId(recRes.value.resumeId);
-      setPrefs({ ...DEFAULT_JOB_PREFERENCES, ...(recRes.value.preferences || {}) });
-    } else {
-      toast.error(apiErrorMessage(recRes.reason, 'Could not load jobs — is the backend up to date?'));
-    }
-    if (savedRes.status === 'fulfilled') setSavedJobs(savedRes.value);
-    setLoading(false);
-  }, []);
+  // Debounce the free-text search so we don't re-fetch on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setQueryDebounced(query), 400);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const loadJobs = useCallback(
+    async (targetPage: number) => {
+      setJobsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(targetPage),
+          pageSize: String(PAGE_SIZE),
+          sortBy,
+        });
+        if (queryDebounced) params.set('q', queryDebounced);
+        if (remoteFilter !== 'any') params.set('remote', remoteFilter);
+        if (countryFilter !== 'any') params.set('country', countryFilter);
+        if (regionFilter !== 'any') params.set('region', regionFilter);
+        if (minMatch > 0) params.set('minMatch', String(minMatch));
+
+        const res = await api<{
+          jobs: Job[];
+          page: number;
+          totalPages: number;
+          totalMatched: number;
+          hasProfile: boolean;
+          sampleData: boolean;
+          resumeId: string | null;
+          preferences: Partial<JobPreferences>;
+        }>(`/jobs/recommended?${params.toString()}`);
+
+        setJobs(res.jobs || []);
+        setPage(res.page || 1);
+        setTotalPages(res.totalPages || 1);
+        setTotalMatched(res.totalMatched ?? (res.jobs || []).length);
+        setHasProfile(res.hasProfile !== false);
+        setSampleData(!!res.sampleData);
+        setResumeId(res.resumeId);
+        setPrefs({ ...DEFAULT_JOB_PREFERENCES, ...(res.preferences || {}) });
+      } catch (err) {
+        toast.error(apiErrorMessage(err, t('jobsPage.toastLoadError')));
+      } finally {
+        setJobsLoading(false);
+        setLoading(false);
+      }
+    },
+    [sortBy, queryDebounced, remoteFilter, countryFilter, regionFilter, minMatch, t]
+  );
+
+  // Re-fetch page 1 whenever a filter changes; re-fetch the current page
+  // (without resetting to 1) when only the page number changes.
+  useEffect(() => {
+    loadJobs(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy, queryDebounced, remoteFilter, countryFilter, regionFilter, minMatch]);
 
   useEffect(() => {
     if (!isLoggedIn()) {
       router.push('/login?redirect=/jobs');
       return;
     }
-    load();
-  }, [router, load]);
+    api<SavedJob[]>('/jobs/saved')
+      .then(setSavedJobs)
+      .catch(() => {
+        /* non-critical for the recommended tab */
+      });
+    loadJobs(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  const goToPage = (p: number) => {
+    if (p < 1 || p > totalPages || p === page) return;
+    loadJobs(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const savedIds = useMemo(() => new Set(savedJobs.map((s) => s.job?.id)), [savedJobs]);
 
-  // Provinces/states available for the selected country, from the loaded jobs.
-  // Dual-country postings carry regions from both sides, so keep only the
-  // regions that actually belong to the selected country.
   const regionOptions = useMemo(() => {
-    if (countryFilter === 'any') return [];
-    const set = new Set<string>();
-    for (const j of jobs) {
-      if (!j.countries?.includes(countryFilter)) continue;
-      for (const r of j.regions || []) {
-        const isProvince = CA_PROVINCES.has(r);
-        if ((countryFilter === 'CA') === isProvince) set.add(r);
-      }
-    }
-    return [...set].sort();
-  }, [jobs, countryFilter]);
+    if (countryFilter === 'CA') return CA_PROVINCE_OPTIONS.map((o) => o.value);
+    if (countryFilter === 'US') return US_STATE_OPTIONS.map((o) => o.value);
+    return [];
+  }, [countryFilter]);
 
-  const filteredJobs = useMemo(() => {
-    let list = jobs.filter((j) => {
-      if (query) {
-        const q = query.toLowerCase();
-        if (!`${j.title} ${j.company} ${j.location} ${j.skills.join(' ')}`.toLowerCase().includes(q)) return false;
-      }
-      if (remoteFilter !== 'any' && j.remote !== remoteFilter) return false;
-      if (countryFilter !== 'any' && !j.countries?.includes(countryFilter)) return false;
-      if (regionFilter !== 'any' && !j.regions?.includes(regionFilter)) return false;
-      if ((j.match?.percent ?? 0) < minMatch) return false;
-      return true;
-    });
-    list = [...list].sort((a, b) => {
-      if (sortBy === 'match') return (b.match?.percent ?? 0) - (a.match?.percent ?? 0);
-      if (sortBy === 'salary') return (b.salaryMax ?? 0) - (a.salaryMax ?? 0);
-      return new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime();
-    });
-    return list;
-  }, [jobs, query, remoteFilter, countryFilter, regionFilter, minMatch, sortBy]);
+  // Fetch (and cache) a job's full description — the list/saved-jobs
+  // endpoints deliberately omit it to stay lightweight, so any action that
+  // actually needs the JD text (save, cover letter, match report) loads it
+  // on demand first.
+  const getFullDescription = async (job: Job): Promise<string> => {
+    if (job.description) return job.description;
+    if (descriptions[job.id] !== undefined) return descriptions[job.id];
+    const full = await api<Job>(`/jobs/detail/${encodeURIComponent(job.id)}`);
+    const text = full.description || '';
+    setDescriptions((prev) => ({ ...prev, [job.id]: text }));
+    return text;
+  };
+
+  const toggleDescription = async (job: Job) => {
+    if (expandedJob === job.id) {
+      setExpandedJob(null);
+      return;
+    }
+    setExpandedJob(job.id);
+    if (descriptions[job.id] !== undefined) return;
+    setDescriptionLoading(job.id);
+    try {
+      await getFullDescription(job);
+    } catch (err) {
+      setDescriptions((prev) => ({ ...prev, [job.id]: 'Could not load the full description.' }));
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setDescriptionLoading(null);
+    }
+  };
 
   const handleSave = async (job: Job) => {
     setBusyJob(job.id);
     try {
+      const description = await getFullDescription(job).catch(() => job.description || '');
       const saved = await api<SavedJob>('/jobs/save', {
         method: 'POST',
-        body: { job: { ...job, match: undefined }, matchPercent: job.match?.percent ?? null },
+        body: { job: { ...job, description, match: undefined }, matchPercent: job.match?.percent ?? null },
       });
       setSavedJobs((prev) => [saved, ...prev.filter((s) => s._id !== saved._id)]);
-      toast.success('Job saved');
+      toast.success(t('jobsPage.toastJobSaved'));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -168,7 +248,7 @@ function JobsContent() {
 
   const handleTailor = async (job: Job) => {
     if (!resumeId) {
-      toast.info('Create a resume first, then tailor it for jobs.');
+      toast.info(t('jobsPage.toastCreateResumeFirst'));
       return;
     }
     setBusyJob(job.id);
@@ -177,7 +257,7 @@ function JobsContent() {
         method: 'POST',
         body: { title: `${job.title} @ ${job.company}` },
       });
-      toast.success('Created a tailored copy — edit it for this job.');
+      toast.success(t('jobsPage.toastTailoredCopyCreated'));
       router.push(`/resume/edit/${copy._id}`);
     } catch (err) {
       toast.error(apiErrorMessage(err));
@@ -186,16 +266,19 @@ function JobsContent() {
   };
 
   // Hand a job's context to the AI tools page (cover letter, interview prep, …).
-  const openToolForJob = (job: Job, tool: 'cover-letter' | 'interview-prep' | 'follow-up-email' | 'thank-you-email') => {
-    sessionStorage.setItem(
-      'tools:jobContext',
-      JSON.stringify({ jobTitle: job.title, company: job.company, jobDescription: job.description })
-    );
+  const openToolForJob = async (job: Job, tool: 'cover-letter' | 'interview-prep' | 'follow-up-email' | 'thank-you-email') => {
+    setBusyJob(job.id);
+    const jobDescription = await getFullDescription(job).catch(() => '');
+    setBusyJob(null);
+    sessionStorage.setItem('tools:jobContext', JSON.stringify({ jobTitle: job.title, company: job.company, jobDescription }));
     router.push(`/tools?tool=${tool}`);
   };
 
-  const handleAnalyzeAgainstJob = (job: Job) => {
-    sessionStorage.setItem('analyze:jobDescription', job.description);
+  const handleAnalyzeAgainstJob = async (job: Job) => {
+    setBusyJob(job.id);
+    const jobDescription = await getFullDescription(job).catch(() => '');
+    setBusyJob(null);
+    sessionStorage.setItem('analyze:jobDescription', jobDescription);
     // Structured metadata enables location/remote/salary rows in the
     // Qualification Evidence Map that a raw pasted JD alone can't provide.
     sessionStorage.setItem(
@@ -209,7 +292,7 @@ function JobsContent() {
     try {
       const updated = await api<SavedJob>(`/jobs/saved/${saved._id}`, { method: 'PATCH', body: { status } });
       setSavedJobs((prev) => prev.map((s) => (s._id === updated._id ? updated : s)));
-      if (status === 'applied') toast.success('Marked as applied — good luck! 🍀');
+      if (status === 'applied') toast.success(t('jobsPage.toastMarkedApplied'));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }
@@ -228,9 +311,8 @@ function JobsContent() {
     setSavingPrefs(true);
     try {
       await api('/jobs/preferences', { method: 'PUT', body: prefs });
-      toast.success('Preferences saved — recommendations updated.');
-      setLoading(true);
-      await load();
+      toast.success(t('jobsPage.toastPrefsSaved'));
+      await loadJobs(1);
       setTab('recommended');
     } catch (err) {
       toast.error(apiErrorMessage(err));
@@ -240,33 +322,40 @@ function JobsContent() {
   };
 
   const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'recommended', label: 'Recommended', icon: Sparkles },
-    { id: 'saved', label: `Saved & Applied (${savedJobs.length})`, icon: Bookmark },
-    { id: 'preferences', label: 'Preferences & Alerts', icon: Settings },
+    { id: 'recommended', label: t('jobsPage.tabRecommended'), icon: Sparkles },
+    { id: 'saved', label: `${t('jobsPage.tabSaved')} (${savedJobs.length})`, icon: Bookmark },
+    { id: 'preferences', label: t('jobsPage.tabPreferences'), icon: Settings },
   ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Job Discovery</h1>
-        <p className="text-slate-500 mt-1 text-sm sm:text-base">
-          Jobs scored against your resume and preferences — with the exact skills you match and miss.
-        </p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('jobsPage.title')}</h1>
+        <p className="text-slate-500 mt-1 text-sm sm:text-base">{t('jobsPage.subtitle')}</p>
       </div>
 
       {sampleData && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-6 text-sm text-amber-800">
           <FlaskConical className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
-          <p>
-            <strong>Development data:</strong> these are realistic sample jobs. Connect a live feed
-            (Greenhouse/Lever company boards via <code className="font-mono text-xs">GREENHOUSE_BOARDS</code> /{' '}
-            <code className="font-mono text-xs">LEVER_COMPANIES</code>) to see real postings.
-          </p>
+          <p>{t('jobsPage.sampleBanner')}</p>
+        </div>
+      )}
+
+      {!hasProfile && (
+        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-6 text-sm text-blue-800">
+          <FileText className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
+          <div className="flex-1">
+            <p>{t('jobsPage.noProfileBanner')}</p>
+            <p className="text-xs text-blue-600 mt-0.5">{t('jobsPage.noProfileBannerSub')}</p>
+          </div>
+          <Button size="sm" onClick={() => router.push('/resume')} className="shrink-0">
+            {t('jobsPage.createResume')}
+          </Button>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1" role="tablist" aria-label="Job sections">
+      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1" role="tablist" aria-label={t('jobsPage.ariaJobSections')}>
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -303,8 +392,8 @@ function JobsContent() {
                     <input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search title, company, skill…"
-                      aria-label="Search jobs"
+                      placeholder={t('jobsPage.searchPlaceholder')}
+                      aria-label={t('jobsPage.searchPlaceholder')}
                       className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -315,21 +404,21 @@ function JobsContent() {
                         setCountryFilter(e.target.value as typeof countryFilter);
                         setRegionFilter('any');
                       }}
-                      aria-label="Filter by country"
+                      aria-label={t('jobsPage.anyCountry')}
                       className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="any">🌎 US & Canada</option>
-                      <option value="CA">🇨🇦 Canada</option>
-                      <option value="US">🇺🇸 United States</option>
+                      <option value="any">{t('jobsPage.anyCountry')}</option>
+                      <option value="CA">{t('jobsPage.canada')}</option>
+                      <option value="US">{t('jobsPage.unitedStates')}</option>
                     </select>
                     {countryFilter !== 'any' && regionOptions.length > 0 && (
                       <select
                         value={regionFilter}
                         onChange={(e) => setRegionFilter(e.target.value)}
-                        aria-label={countryFilter === 'CA' ? 'Filter by province' : 'Filter by state'}
+                        aria-label={countryFilter === 'CA' ? t('jobsPage.prefProvinces') : t('jobsPage.prefStates')}
                         className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="any">{countryFilter === 'CA' ? 'All provinces' : 'All states'}</option>
+                        <option value="any">{countryFilter === 'CA' ? t('jobsPage.allProvinces') : t('jobsPage.allStates')}</option>
                         {regionOptions.map((r) => (
                           <option key={r} value={r}>
                             {r}
@@ -340,56 +429,62 @@ function JobsContent() {
                     <select
                       value={remoteFilter}
                       onChange={(e) => setRemoteFilter(e.target.value)}
-                      aria-label="Filter by work style"
+                      aria-label={t('jobsPage.anyLocationType')}
                       className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="any">Any location type</option>
-                      <option value="remote">Remote</option>
-                      <option value="hybrid">Hybrid</option>
-                      <option value="onsite">On-site</option>
+                      <option value="any">{t('jobsPage.anyLocationType')}</option>
+                      <option value="remote">{t('jobsPage.remote')}</option>
+                      <option value="hybrid">{t('jobsPage.hybrid')}</option>
+                      <option value="onsite">{t('jobsPage.onsite')}</option>
                     </select>
                     <select
                       value={minMatch}
                       onChange={(e) => setMinMatch(Number(e.target.value))}
-                      aria-label="Minimum match"
+                      aria-label={t('jobsPage.anyMatch')}
                       className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value={0}>Any match</option>
-                      <option value={50}>50%+ match</option>
-                      <option value={70}>70%+ match</option>
-                      <option value={85}>85%+ match</option>
+                      <option value={0}>{t('jobsPage.anyMatch')}</option>
+                      <option value={50}>{t('jobsPage.matchPlus', { n: 50 })}</option>
+                      <option value={70}>{t('jobsPage.matchPlus', { n: 70 })}</option>
+                      <option value={85}>{t('jobsPage.matchPlus', { n: 85 })}</option>
                     </select>
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                      aria-label="Sort jobs"
+                      aria-label={t('jobsPage.sortBestMatch')}
                       className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="match">Best match</option>
-                      <option value="date">Newest</option>
-                      <option value="salary">Highest salary</option>
+                      <option value="match">{t('jobsPage.sortBestMatch')}</option>
+                      <option value="date">{t('jobsPage.sortNewest')}</option>
+                      <option value="salary">{t('jobsPage.sortSalary')}</option>
                     </select>
                   </div>
                 </div>
               </Card>
 
-              {totalMatched > jobs.length && (
+              {totalMatched > 0 && (
                 <p className="text-xs text-slate-500 px-1">
-                  Showing your top {jobs.length} matches from {totalMatched.toLocaleString()} live postings.
+                  {t('jobsPage.pageOf', { page, totalPages, total: totalMatched.toLocaleString() })}
                 </p>
               )}
 
-              {filteredJobs.length === 0 ? (
+              {jobsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(PAGE_SIZE)].map((_, i) => (
+                    <Skeleton key={i} className="h-40" />
+                  ))}
+                </div>
+              ) : jobs.length === 0 ? (
                 <Card>
                   <EmptyState
                     icon={<Briefcase className="w-6 h-6" />}
-                    title="No jobs match your filters"
-                    description="Try loosening the filters, or update your preferences so we can find better matches."
-                    action={<Button variant="outline" onClick={() => setTab('preferences')}>Edit preferences</Button>}
+                    title={t('jobsPage.noJobsTitle')}
+                    description={t('jobsPage.noJobsDescription')}
+                    action={<Button variant="outline" onClick={() => setTab('preferences')}>{t('jobsPage.editPreferences')}</Button>}
                   />
                 </Card>
               ) : (
-                filteredJobs.map((job, i) => (
+                jobs.map((job, i) => (
                   <motion.div
                     key={job.id}
                     initial={{ opacity: 0, y: 12 }}
@@ -402,7 +497,7 @@ function JobsContent() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="text-base sm:text-lg font-semibold text-slate-900">{job.title}</h3>
-                              {job.isSampleData && <Badge tone="amber">sample</Badge>}
+                              {job.isSampleData && <Badge tone="amber">{t('jobsPage.sampleBadge')}</Badge>}
                             </div>
                             <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-3 flex-wrap">
                               <span className="font-medium text-slate-700">{job.company}</span>
@@ -415,6 +510,12 @@ function JobsContent() {
                                   {salaryText(job)}
                                 </span>
                               )}
+                              {job.postedAt && (
+                                <span className="text-slate-400">
+                                  {t('jobsPage.posted', { date: formatDate(job.postedAt) })}
+                                </span>
+                              )}
+                              {job.source && <span className="text-slate-400">{t('jobsPage.via', { source: job.source })}</span>}
                             </p>
                             <div className="flex gap-1.5 mt-2 flex-wrap">
                               <Badge tone="slate">{job.remote}</Badge>
@@ -426,7 +527,7 @@ function JobsContent() {
                               ))}
                             </div>
                           </div>
-                          {job.match && (
+                          {job.match ? (
                             <div className="text-center shrink-0">
                               <div
                                 className="text-2xl font-bold"
@@ -435,6 +536,11 @@ function JobsContent() {
                                 {job.match.percent}%
                               </div>
                               <div className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">match</div>
+                            </div>
+                          ) : (
+                            <div className="text-center shrink-0 max-w-[7rem]">
+                              <div className="text-lg font-bold text-slate-300">—</div>
+                              <div className="text-[11px] text-slate-400 leading-tight">{t('jobsPage.addResumeForScore')}</div>
                             </div>
                           )}
                         </div>
@@ -463,13 +569,13 @@ function JobsContent() {
                           </ul>
                         )}
 
-                        {/* Description toggle */}
+                        {/* Description toggle — fetched lazily on first expand */}
                         <button
-                          onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+                          onClick={() => toggleDescription(job)}
                           className="mt-3 text-xs font-medium text-slate-500 hover:text-blue-600 flex items-center gap-1 transition"
                           aria-expanded={expandedJob === job.id}
                         >
-                          {expandedJob === job.id ? 'Hide' : 'Show'} description
+                          {expandedJob === job.id ? t('jobsPage.hideDescription') : t('jobsPage.showDescription')}
                           <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', expandedJob === job.id && 'rotate-180')} aria-hidden />
                         </button>
                         <AnimatePresence>
@@ -480,9 +586,17 @@ function JobsContent() {
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <p className="mt-2 text-sm text-slate-600 whitespace-pre-line bg-slate-50 rounded-xl p-4">
-                                {job.description}
-                              </p>
+                              {descriptionLoading === job.id ? (
+                                <div className="mt-2 space-y-2 bg-slate-50 rounded-xl p-4">
+                                  <Skeleton className="h-3.5 w-full" />
+                                  <Skeleton className="h-3.5 w-5/6" />
+                                  <Skeleton className="h-3.5 w-2/3" />
+                                </div>
+                              ) : (
+                                <p className="mt-2 text-sm text-slate-600 whitespace-pre-line bg-slate-50 rounded-xl p-4">
+                                  {descriptions[job.id] || job.description}
+                                </p>
+                              )}
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -497,7 +611,7 @@ function JobsContent() {
                           disabled={savedIds.has(job.id) || busyJob === job.id}
                           onClick={() => handleSave(job)}
                         >
-                          {savedIds.has(job.id) ? 'Saved' : 'Save'}
+                          {savedIds.has(job.id) ? t('jobsPage.saved') : t('jobsPage.save')}
                         </Button>
                         <Button
                           size="sm"
@@ -506,26 +620,28 @@ function JobsContent() {
                           loading={busyJob === job.id}
                           onClick={() => handleTailor(job)}
                         >
-                          Tailor resume
+                          {t('jobsPage.tailorResume')}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           icon={<Sparkles className="w-3.5 h-3.5" />}
+                          loading={busyJob === job.id}
                           onClick={() => openToolForJob(job, 'cover-letter')}
                         >
-                          Cover letter
+                          {t('jobsPage.coverLetter')}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           icon={<MessagesSquare className="w-3.5 h-3.5" />}
+                          loading={busyJob === job.id}
                           onClick={() => openToolForJob(job, 'interview-prep')}
                         >
-                          Interview prep
+                          {t('jobsPage.interviewPrep')}
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleAnalyzeAgainstJob(job)}>
-                          Full match report
+                        <Button size="sm" variant="ghost" loading={busyJob === job.id} onClick={() => handleAnalyzeAgainstJob(job)}>
+                          {t('jobsPage.matchReport')}
                         </Button>
                         {job.url && (
                           <a
@@ -534,13 +650,43 @@ function JobsContent() {
                             rel="noopener noreferrer"
                             className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
                           >
-                            Apply on company site <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+                            {t('jobsPage.applyOnSite')} <ExternalLink className="w-3.5 h-3.5" aria-hidden />
                           </a>
                         )}
                       </div>
                     </Card>
                   </motion.div>
                 ))
+              )}
+
+              {!jobsLoading && jobs.length > 0 && totalPages > 1 && (
+                <nav className="flex items-center justify-center gap-1.5 pt-2" aria-label={t('jobsPage.ariaJobResultsPages')}>
+                  <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
+                    {t('jobsPage.previous')}
+                  </Button>
+                  {paginationWindow(page, totalPages).map((p, i) =>
+                    p === '…' ? (
+                      <span key={`ellipsis-${i}`} className="px-2 text-sm text-slate-400">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => goToPage(p as number)}
+                        aria-current={p === page ? 'page' : undefined}
+                        className={clsx(
+                          'w-9 h-9 rounded-lg text-sm font-medium transition',
+                          p === page ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                        )}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                  <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>
+                    {t('jobsPage.next')}
+                  </Button>
+                </nav>
               )}
             </div>
           )}
@@ -552,9 +698,9 @@ function JobsContent() {
                 <Card>
                   <EmptyState
                     icon={<Bookmark className="w-6 h-6" />}
-                    title="No saved jobs yet"
-                    description="Save jobs from the Recommended tab to track your applications here."
-                    action={<Button variant="outline" onClick={() => setTab('recommended')}>Browse jobs</Button>}
+                    title={t('jobsPage.noSavedTitle')}
+                    description={t('jobsPage.noSavedDescription')}
+                    action={<Button variant="outline" onClick={() => setTab('recommended')}>{t('jobsPage.browseJobs')}</Button>}
                   />
                 </Card>
               ) : (
@@ -566,20 +712,19 @@ function JobsContent() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-slate-900">{saved.job.title}</h3>
-                            <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
+                            <Badge tone={statusMeta.tone}>{t(statusMeta.labelKey)}</Badge>
                             {typeof saved.matchPercent === 'number' && (
-                              <Badge tone={scoreTone(saved.matchPercent)}>{saved.matchPercent}% match</Badge>
+                              <Badge tone={scoreTone(saved.matchPercent)}>{t('jobsPage.matchScoreLabel', { n: saved.matchPercent })}</Badge>
                             )}
                           </div>
                           <p className="text-sm text-slate-500 mt-0.5">
                             {saved.job.company} · {saved.job.location}
-                            {saved.appliedAt &&
-                              ` · applied ${new Date(saved.appliedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
+                            {saved.appliedAt && ` · ${t('jobsPage.appliedOn', { date: formatDate(saved.appliedAt) })}`}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <label className="sr-only" htmlFor={`status-${saved._id}`}>
-                            Application status
+                            {t('jobsPage.applicationStatus')}
                           </label>
                           <select
                             id={`status-${saved._id}`}
@@ -589,7 +734,7 @@ function JobsContent() {
                           >
                             {STATUS_OPTIONS.map((s) => (
                               <option key={s.value} value={s.value}>
-                                {s.label}
+                                {t(s.labelKey)}
                               </option>
                             ))}
                           </select>
@@ -598,7 +743,7 @@ function JobsContent() {
                               href={saved.job.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              aria-label="Open job posting"
+                              aria-label={t('jobsPage.openJobPosting')}
                               className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                             >
                               <ExternalLink className="w-4 h-4" />
@@ -606,7 +751,7 @@ function JobsContent() {
                           )}
                           <button
                             onClick={() => removeSaved(saved)}
-                            aria-label="Remove saved job"
+                            aria-label={t('jobsPage.removeSavedJob')}
                             className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -616,29 +761,29 @@ function JobsContent() {
 
                       {/* Next-step AI actions matched to where the application is */}
                       <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2 items-center">
-                        <span className="text-xs text-slate-400 font-medium uppercase tracking-wide mr-1">Prepare</span>
+                        <span className="text-xs text-slate-400 font-medium uppercase tracking-wide mr-1">{t('jobsPage.prepare')}</span>
                         {saved.status === 'saved' && (
                           <Button size="sm" variant="outline" icon={<Sparkles className="w-3.5 h-3.5" />} onClick={() => openToolForJob(saved.job, 'cover-letter')}>
-                            Cover letter
+                            {t('jobsPage.coverLetter')}
                           </Button>
                         )}
                         {saved.status === 'applied' && (
                           <Button size="sm" variant="outline" onClick={() => openToolForJob(saved.job, 'follow-up-email')}>
-                            Follow-up email
+                            {t('jobsPage.followUpEmail')}
                           </Button>
                         )}
                         {saved.status === 'interviewing' && (
                           <Button size="sm" variant="outline" onClick={() => openToolForJob(saved.job, 'thank-you-email')}>
-                            Thank-you email
+                            {t('jobsPage.thankYouEmail')}
                           </Button>
                         )}
                         {(saved.status === 'saved' || saved.status === 'applied' || saved.status === 'interviewing') && (
                           <Button size="sm" variant="outline" icon={<MessagesSquare className="w-3.5 h-3.5" />} onClick={() => openToolForJob(saved.job, 'interview-prep')}>
-                            Interview prep
+                            {t('jobsPage.interviewPrep')}
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => handleAnalyzeAgainstJob(saved.job)}>
-                          Match report
+                          {t('jobsPage.matchReport')}
                         </Button>
                       </div>
                     </Card>
@@ -653,37 +798,67 @@ function JobsContent() {
             <div className="max-w-3xl space-y-6">
               <Card className="space-y-5">
                 <div>
-                  <h2 className="font-semibold text-slate-900 mb-1">Job preferences</h2>
-                  <p className="text-sm text-slate-500">
-                    These shape your recommendations and match scores alongside your resume content.
-                  </p>
+                  <h2 className="font-semibold text-slate-900 mb-1">{t('jobsPage.prefsTitle')}</h2>
+                  <p className="text-sm text-slate-500">{t('jobsPage.prefsSubtitle')}</p>
                 </div>
                 <TagInput
                   id="pref-titles"
-                  label="Preferred job titles"
+                  label={t('jobsPage.prefTitles')}
                   values={prefs.titles}
                   onChange={(titles) => setPrefs((p) => ({ ...p, titles }))}
-                  placeholder="e.g. Frontend Developer — press Enter to add"
+                  placeholder={t('jobsPage.prefTitlesPlaceholder')}
                 />
                 <TagInput
                   id="pref-skills"
-                  label="Key skills"
+                  label={t('jobsPage.prefSkills')}
                   values={prefs.skills}
                   onChange={(skills) => setPrefs((p) => ({ ...p, skills }))}
-                  placeholder="e.g. React, SQL, project management"
-                  helper="Skills from your resume are matched automatically — add extras here."
+                  placeholder={t('jobsPage.prefSkillsPlaceholder')}
+                  helper={t('jobsPage.prefSkillsHelper')}
                 />
+                <MultiSelect
+                  id="pref-countries"
+                  label={t('jobsPage.prefCountries')}
+                  options={COUNTRY_OPTIONS}
+                  values={prefs.countries}
+                  onChange={(countries) => setPrefs((p) => ({ ...p, countries }))}
+                  placeholder={t('jobsPage.prefCountriesPlaceholder')}
+                  searchable={false}
+                />
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {prefs.countries.includes('CA') && (
+                    <MultiSelect
+                      id="pref-ca-provinces"
+                      label={t('jobsPage.prefProvinces')}
+                      options={CA_PROVINCE_OPTIONS}
+                      values={prefs.caProvinces}
+                      onChange={(caProvinces) => setPrefs((p) => ({ ...p, caProvinces }))}
+                      placeholder={t('jobsPage.prefProvincesPlaceholder')}
+                    />
+                  )}
+                  {prefs.countries.includes('US') && (
+                    <MultiSelect
+                      id="pref-us-states"
+                      label={t('jobsPage.prefStates')}
+                      options={US_STATE_OPTIONS}
+                      values={prefs.usStates}
+                      onChange={(usStates) => setPrefs((p) => ({ ...p, usStates }))}
+                      placeholder={t('jobsPage.prefStatesPlaceholder')}
+                    />
+                  )}
+                </div>
                 <TagInput
-                  id="pref-locations"
-                  label="Preferred locations"
-                  values={prefs.locations}
-                  onChange={(locations) => setPrefs((p) => ({ ...p, locations }))}
-                  placeholder="e.g. Toronto, Vancouver"
+                  id="pref-cities"
+                  label={t('jobsPage.prefCities')}
+                  values={prefs.cities}
+                  onChange={(cities) => setPrefs((p) => ({ ...p, cities }))}
+                  placeholder={t('jobsPage.prefCitiesPlaceholder')}
+                  helper={t('jobsPage.prefCitiesHelper')}
                 />
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="pref-worktype" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Work type
+                      {t('jobsPage.prefWorkType')}
                     </label>
                     <select
                       id="pref-worktype"
@@ -691,32 +866,25 @@ function JobsContent() {
                       onChange={(e) => setPrefs((p) => ({ ...p, workType: e.target.value as JobPreferences['workType'] }))}
                       className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="any">Any</option>
-                      <option value="full-time">Full-time</option>
-                      <option value="part-time">Part-time</option>
-                      <option value="contract">Contract</option>
-                      <option value="internship">Internship</option>
+                      <option value="any">{t('jobsPage.workTypeAny')}</option>
+                      <option value="full-time">{t('jobsPage.workTypeFullTime')}</option>
+                      <option value="part-time">{t('jobsPage.workTypePartTime')}</option>
+                      <option value="contract">{t('jobsPage.workTypeContract')}</option>
+                      <option value="internship">{t('jobsPage.workTypeInternship')}</option>
                     </select>
                   </div>
-                  <div>
-                    <label htmlFor="pref-remote" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Remote preference
-                    </label>
-                    <select
-                      id="pref-remote"
-                      value={prefs.remote}
-                      onChange={(e) => setPrefs((p) => ({ ...p, remote: e.target.value as JobPreferences['remote'] }))}
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="any">Any</option>
-                      <option value="remote">Remote only</option>
-                      <option value="hybrid">Hybrid</option>
-                      <option value="onsite">On-site</option>
-                    </select>
-                  </div>
+                  <MultiSelect
+                    id="pref-remote"
+                    label={t('jobsPage.prefWorkStyle')}
+                    options={WORK_STYLE_OPTIONS}
+                    values={prefs.remoteTypes}
+                    onChange={(remoteTypes) => setPrefs((p) => ({ ...p, remoteTypes: remoteTypes as JobPreferences['remoteTypes'] }))}
+                    placeholder={t('jobsPage.prefWorkStylePlaceholder')}
+                    searchable={false}
+                  />
                   <div>
                     <label htmlFor="pref-salmin" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Minimum salary ($/yr)
+                      {t('jobsPage.prefSalaryMin')}
                     </label>
                     <input
                       id="pref-salmin"
@@ -730,7 +898,7 @@ function JobsContent() {
                   </div>
                   <div>
                     <label htmlFor="pref-salmax" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Target salary ($/yr)
+                      {t('jobsPage.prefSalaryMax')}
                     </label>
                     <input
                       id="pref-salmax"
@@ -748,12 +916,12 @@ function JobsContent() {
               <Card className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Bell className="w-4 h-4 text-blue-500" aria-hidden />
-                  <h2 className="font-semibold text-slate-900">Job alerts</h2>
+                  <h2 className="font-semibold text-slate-900">{t('jobsPage.alertsTitle')}</h2>
                 </div>
                 <label className="flex items-center justify-between gap-4 cursor-pointer">
                   <span className="text-sm text-slate-700">
-                    <span className="font-medium">In-app notifications</span>
-                    <span className="block text-xs text-slate-500">Get notified when a new job strongly matches your resume.</span>
+                    <span className="font-medium">{t('jobsPage.alertsInApp')}</span>
+                    <span className="block text-xs text-slate-500">{t('jobsPage.alertsInAppHelper')}</span>
                   </span>
                   <input
                     type="checkbox"
@@ -764,10 +932,8 @@ function JobsContent() {
                 </label>
                 <label className="flex items-center justify-between gap-4 cursor-pointer">
                   <span className="text-sm text-slate-700">
-                    <span className="font-medium">Email alerts</span>
-                    <span className="block text-xs text-slate-500">
-                      Also send strong matches by email (requires email provider configured on the server).
-                    </span>
+                    <span className="font-medium">{t('jobsPage.alertsEmail')}</span>
+                    <span className="block text-xs text-slate-500">{t('jobsPage.alertsEmailHelper')}</span>
                   </span>
                   <input
                     type="checkbox"
@@ -778,7 +944,8 @@ function JobsContent() {
                 </label>
                 <div>
                   <label htmlFor="pref-threshold" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Alert threshold: <span className="text-blue-600 font-bold">{prefs.alertThreshold}%+ match</span>
+                    {t('jobsPage.alertThresholdLabel')}{' '}
+                    <span className="text-blue-600 font-bold">{t('jobsPage.matchPlus', { n: prefs.alertThreshold })}</span>
                   </label>
                   <input
                     id="pref-threshold"
@@ -794,7 +961,7 @@ function JobsContent() {
               </Card>
 
               <Button loading={savingPrefs} onClick={savePreferences} size="lg">
-                Save preferences
+                {t('jobsPage.savePreferences')}
               </Button>
             </div>
           )}

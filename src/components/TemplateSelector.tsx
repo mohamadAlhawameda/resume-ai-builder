@@ -3,13 +3,14 @@
 import React from 'react';
 import clsx from 'clsx';
 import type { TemplateId } from '@/lib/types';
+import { useLocale } from '@/i18n/LocaleProvider';
 
-const TEMPLATES: { id: TemplateId; label: string; hint: string }[] = [
-  { id: 'classic', label: 'Classic', hint: 'Traditional serif — safest for ATS' },
-  { id: 'modern', label: 'Modern', hint: 'Clean with accent headings' },
-  { id: 'minimal', label: 'Minimal', hint: 'Compact and understated' },
-  { id: 'executive', label: 'Executive', hint: 'Two-column with dark sidebar' },
-  { id: 'creative', label: 'Creative', hint: 'Bold banner for design roles' },
+const TEMPLATES: { id: TemplateId; labelKey: string; hintKey: string }[] = [
+  { id: 'classic', labelKey: 'builderPage.templateClassic', hintKey: 'builderPage.templateClassicHint' },
+  { id: 'modern', labelKey: 'builderPage.templateModern', hintKey: 'builderPage.templateModernHint' },
+  { id: 'minimal', labelKey: 'builderPage.templateMinimal', hintKey: 'builderPage.templateMinimalHint' },
+  { id: 'executive', labelKey: 'builderPage.templateExecutive', hintKey: 'builderPage.templateExecutiveHint' },
+  { id: 'creative', labelKey: 'builderPage.templateCreative', hintKey: 'builderPage.templateCreativeHint' },
 ];
 
 type TemplateSelectorProps = {
@@ -18,15 +19,16 @@ type TemplateSelectorProps = {
 };
 
 export default function TemplateSelector({ template, setTemplate }: TemplateSelectorProps) {
+  const { t } = useLocale();
   return (
-    <div role="radiogroup" aria-label="Resume template" className="flex flex-wrap gap-2">
+    <div role="radiogroup" aria-label={t('builderPage.resumeTemplateAria')} className="flex flex-wrap gap-2">
       {TEMPLATES.map((tpl) => (
         <button
           key={tpl.id}
           type="button"
           role="radio"
           aria-checked={template === tpl.id}
-          title={tpl.hint}
+          title={t(tpl.hintKey)}
           onClick={() => setTemplate(tpl.id)}
           className={clsx(
             'px-3.5 py-2 rounded-xl text-sm font-medium border transition-all duration-150',
@@ -35,7 +37,7 @@ export default function TemplateSelector({ template, setTemplate }: TemplateSele
               : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'
           )}
         >
-          {tpl.label}
+          {t(tpl.labelKey)}
         </button>
       ))}
     </div>

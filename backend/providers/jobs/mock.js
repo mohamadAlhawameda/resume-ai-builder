@@ -140,6 +140,7 @@ const mockProvider = {
     return JOBS.map((j) => ({
       id: `mock:${j.externalId}`,
       provider: 'mock',
+      source: 'Sample Data',
       url: '',
       isSampleData: true,
       ...j,

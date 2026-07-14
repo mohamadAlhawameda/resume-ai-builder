@@ -6,6 +6,7 @@
 
 import { findSkillsInText } from '../../utils/text.js';
 import { prettyCompanyName } from './companyName.js';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout.js';
 
 function stripHtml(html = '') {
   return html
@@ -34,8 +35,9 @@ const greenhouseProvider = {
     const results = [];
     for (const board of boards) {
       try {
-        const res = await fetch(
-          `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs?content=true`
+        const res = await fetchWithTimeout(
+          `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs?content=true`,
+          { timeoutMs: 8000 }
         );
         if (!res.ok) {
           console.warn(`Greenhouse board "${board}" returned ${res.status}`);
@@ -47,6 +49,7 @@ const greenhouseProvider = {
           results.push({
             id: `greenhouse:${board}:${job.id}`,
             provider: 'greenhouse',
+            source: 'Greenhouse',
             externalId: String(job.id),
             title: job.title || 'Untitled role',
             company: job.company_name || prettyCompanyName(board),

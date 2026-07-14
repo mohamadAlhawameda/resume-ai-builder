@@ -9,6 +9,8 @@ const PRODUCT_LINKS = [
   { href: '/resume', labelKey: 'footer.resumeBuilder' },
   { href: '/analyze', labelKey: 'footer.resumeScanner' },
   { href: '/jobs', labelKey: 'footer.jobMatching' },
+  { href: '/radar', labelKey: 'footer.opportunityRadar' },
+  { href: '/profile', labelKey: 'footer.careerProfile' },
   { href: '/tools', labelKey: 'footer.aiTools' },
 ];
 
@@ -69,8 +71,8 @@ export default function Footer() {
           </ul>
         </nav>
 
-        {/* Company */}
-        <nav aria-label="Company">
+        {/* Explore */}
+        <nav aria-label={t('footer.company')}>
           <h4 className="text-sm font-semibold text-slate-900 mb-4 tracking-wide uppercase">{t('footer.company')}</h4>
           <ul className="space-y-2.5">
             {COMPANY_LINKS.map(({ href, labelKey }) => (

@@ -15,6 +15,7 @@ import {
   Info,
   Loader2,
 } from 'lucide-react';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 // Contact form data shape
 interface ContactData {
@@ -53,44 +54,45 @@ export default function ContactStep({
   isDeveloper,
   onDeveloperToggle,
 }: ContactStepProps) {
+  const { t } = useLocale();
   const isFilled = (val: string | undefined) => (val?.trim() ?? '').length > 0;
 
   const fields = [
     {
       id: 'fullName' as keyof ContactData,
-      label: 'Full Name',
+      label: t('builderPage.fullName'),
       icon: <User className="w-5 h-5" />,
-      helper: 'Include your full legal name.',
+      helper: t('builderPage.fullNameHelper'),
     },
     {
       id: 'email' as keyof ContactData,
-      label: 'Email Address',
+      label: t('builderPage.emailAddress'),
       icon: <Mail className="w-5 h-5" />,
-      helper: 'Use a professional and active email.',
+      helper: t('builderPage.emailHelper'),
     },
     {
       id: 'phone' as keyof ContactData,
-      label: 'Phone Number',
+      label: t('builderPage.phoneNumber'),
       icon: <Phone className="w-5 h-5" />,
-      helper: 'Include your country code.',
+      helper: t('builderPage.phoneHelper'),
     },
     {
       id: 'city' as keyof ContactData,
-      label: 'City',
+      label: t('builderPage.city'),
       icon: <MapPin className="w-5 h-5" />,
-      helper: 'City you are based in or applying to.',
+      helper: t('builderPage.cityHelper'),
     },
     {
       id: 'postalCode' as keyof ContactData,
-      label: 'Postal Code',
+      label: t('builderPage.postalCode'),
       icon: <Landmark className="w-5 h-5" />,
-      helper: 'Helps with regional targeting.',
+      helper: t('builderPage.postalCodeHelper'),
     },
     {
       id: 'linkedIn' as keyof ContactData,
-      label: 'LinkedIn URL',
+      label: t('builderPage.linkedinUrl'),
       icon: <Linkedin className="w-5 h-5" />,
-      helper: 'Paste your full LinkedIn profile link.',
+      helper: t('builderPage.linkedinHelper'),
     },
   ];
 
@@ -102,10 +104,8 @@ export default function ContactStep({
       className="bg-white p-8 rounded-3xl shadow-2xl space-y-12 border border-gray-200"
     >
       <div className="text-center space-y-1">
-        <h2 className="text-4xl font-extrabold text-gray-900">Contact Details</h2>
-        <p className="text-gray-500 text-sm max-w-xl mx-auto">
-          Start by filling in your contact details. We&apos;ll help you turn this into a clean and modern resume.
-        </p>
+        <h2 className="text-4xl font-extrabold text-gray-900">{t('builderPage.contactTitle')}</h2>
+        <p className="text-gray-500 text-sm max-w-xl mx-auto">{t('builderPage.contactSubtitle')}</p>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-6">
@@ -162,7 +162,7 @@ export default function ContactStep({
           className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
         />
         <label htmlFor="isDeveloper" className="text-sm text-gray-700">
-          I&apos;m a developer — show GitHub field
+          {t('builderPage.isDeveloperLabel')}
         </label>
       </div>
 
@@ -176,7 +176,7 @@ export default function ContactStep({
                 isFilled(formData.github) ? 'top-1 text-xs text-blue-600' : 'top-5 text-gray-400'
               )}
             >
-              GitHub URL
+              {t('builderPage.githubUrl')}
             </label>
             <div className="flex items-center gap-3 mt-1">
               <div className="text-blue-500">
@@ -204,14 +204,14 @@ export default function ContactStep({
             </div>
           </div>
           <p className="text-xs text-gray-500 flex items-center gap-1 pl-2">
-            <Info className="w-3.5 h-3.5 text-gray-400" /> Showcase your GitHub portfolio and contributions.
+            <Info className="w-3.5 h-3.5 text-gray-400" /> {t('builderPage.githubHelper')}
           </p>
         </div>
       )}
 
       <div className="mt-10 space-y-2">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">Professional Summary</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{t('builderPage.professionalSummary')}</h3>
           <button
             type="button"
             onClick={getSummarySuggestions}
@@ -221,12 +221,12 @@ export default function ContactStep({
             }`}
           >
             {aiLoading && <Loader2 className="animate-spin h-4 w-4" />}
-            {aiLoading ? 'Generating...' : 'AI Suggestion'}
+            {aiLoading ? t('builderPage.generating') : t('builderPage.aiSuggestion')}
           </button>
         </div>
         <textarea
           rows={5}
-          placeholder="E.g. Results-driven developer with 3+ years of experience in frontend engineering..."
+          placeholder={t('builderPage.summaryPlaceholder')}
           value={summary}
           onChange={(e) => onSummaryChange(e.target.value)}
           className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"

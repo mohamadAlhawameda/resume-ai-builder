@@ -15,11 +15,36 @@ router.use(authMiddleware);
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+// Every resume needs a clear, distinct name (e.g. "Software Developer
+// Resume") so users tailoring several versions can tell them apart at a
+// glance. Comparison is case/whitespace-insensitive and scoped per user.
+async function findTitleCollision(userId, title, excludeId) {
+  const query = { userId, title: new RegExp(`^${title.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+  if (excludeId) query._id = { $ne: excludeId };
+  return Resume.findOne(query).select('_id title');
+}
+
+/** Append " (2)", " (3)", … until the title is unique for this user — used by
+ * non-interactive flows (import, duplicate) that can't prompt for a rename. */
+async function uniqueTitleSuffix(userId, desired, excludeId) {
+  let candidate = desired.slice(0, 160);
+  let n = 2;
+  while (await findTitleCollision(userId, candidate, excludeId)) {
+    const suffix = ` (${n})`;
+    candidate = `${desired.slice(0, 160 - suffix.length)}${suffix}`;
+    n += 1;
+  }
+  return candidate;
+}
+
 const createSchema = Joi.object({
   id: Joi.string().hex().length(24).optional(),
   data: resumeDataSchema.required(),
   templateId: Joi.string().valid('classic', 'modern', 'minimal', 'executive', 'creative', 'default').optional(),
-  title: Joi.string().allow('').max(160).optional(),
+  title: Joi.string().trim().min(1).max(160).required().messages({
+    'string.empty': 'Give this resume a clear name, e.g. "Software Developer Resume".',
+    'any.required': 'Give this resume a clear name, e.g. "Software Developer Resume".',
+  }),
   versionLabel: Joi.string().allow('').max(120).optional(),
 });
 
@@ -31,6 +56,14 @@ router.post('/create', validateBody(createSchema), async (req, res) => {
   const { id, data, templateId, title, versionLabel } = req.body;
 
   try {
+    const collision = await findTitleCollision(userId, title, id);
+    if (collision) {
+      return res.status(409).json({
+        message: `You already have a resume named "${collision.title}". Please choose a different name.`,
+        code: 'DUPLICATE_TITLE',
+      });
+    }
+
     if (id) {
       const existing = await Resume.findOne({ _id: id, userId });
       if (!existing) return res.status(404).json({ message: 'Resume not found' });
@@ -51,7 +84,7 @@ router.post('/create', validateBody(createSchema), async (req, res) => {
 
       existing.data = data;
       if (templateId) existing.templateId = templateId;
-      if (title !== undefined) existing.title = title;
+      existing.title = title;
       await existing.save();
       return res.json(existing);
     } else {
@@ -59,7 +92,7 @@ router.post('/create', validateBody(createSchema), async (req, res) => {
         userId,
         data,
         templateId: templateId || 'classic',
-        title: title || data.title || data.fullName || 'Untitled resume',
+        title,
       });
       await newResume.save();
       res.status(201).json(newResume);
@@ -127,11 +160,12 @@ router.post('/import', importLimiter, (req, res) => {
       }
 
       const baseName = (req.file.originalname || 'resume').replace(/\.(pdf|docx)$/i, '');
+      const title = await uniqueTitleSuffix(req.user.userId, `Imported — ${baseName}`);
       const resume = new Resume({
         userId: req.user.userId,
         data: value,
         templateId: 'classic',
-        title: `Imported — ${baseName}`.slice(0, 160),
+        title,
       });
       await resume.save();
 
@@ -185,10 +219,11 @@ router.post('/duplicate/:id', async (req, res) => {
     const source = await Resume.findOne({ _id: req.params.id, userId });
     if (!source) return res.status(404).json({ message: 'Resume not found' });
 
-    const copyTitle =
+    const desiredTitle =
       typeof req.body?.title === 'string' && req.body.title.trim()
         ? req.body.title.trim().slice(0, 160)
         : `${source.title || source.data?.fullName || 'Resume'} (copy)`;
+    const copyTitle = await uniqueTitleSuffix(userId, desiredTitle);
 
     const copy = new Resume({
       userId,
@@ -212,6 +247,13 @@ router.patch(
     const userId = req.user.userId;
     if (!isValidId(req.params.id)) return res.status(400).json({ message: 'Invalid resume id' });
     try {
+      const collision = await findTitleCollision(userId, req.body.title, req.params.id);
+      if (collision) {
+        return res.status(409).json({
+          message: `You already have a resume named "${collision.title}". Please choose a different name.`,
+          code: 'DUPLICATE_TITLE',
+        });
+      }
       const updated = await Resume.findOneAndUpdate(
         { _id: req.params.id, userId },
         { title: req.body.title },

@@ -10,7 +10,7 @@ import Resume from '../models/Resume.js';
 import SavedJob from '../models/SavedJob.js';
 import Notification from '../models/Notification.js';
 import CareerProfile from '../models/CareerProfile.js';
-import { fetchAllJobs, usingSampleData } from '../providers/jobs/index.js';
+import { fetchAllJobs, getJobById, usingSampleData } from '../providers/jobs/index.js';
 import { scoreJobForUser, summarizeSkillGaps } from '../utils/jobMatch.js';
 import { validateBody, jobPreferencesSchema } from '../utils/validate.js';
 import { sendJobAlertEmail, sendApplicationStatusEmail } from '../services/email.js';
@@ -83,6 +83,14 @@ async function generateAlerts(user, scoredJobs) {
 }
 
 // GET /jobs/recommended?resumeId=...&limit=...
+// Strip the (large) description before sending a page of results over the
+// wire — scoring already happened server-side against the full text, so the
+// list view never needs it. The full text is fetched on demand via GET /jobs/:id.
+function toSummary(job) {
+  const { description, ...summary } = job;
+  return summary;
+}
+
 router.get('/recommended', async (req, res) => {
   try {
     const { user, resumeData, resumeId } = await getContext(req.user.userId, req.query.resumeId);
@@ -91,23 +99,77 @@ router.get('/recommended', async (req, res) => {
     const jobs = await fetchAllJobs();
     const prefs = user.jobPreferences?.toObject ? user.jobPreferences.toObject() : (user.jobPreferences || {});
 
-    const scored = jobs
-      .map((job) => ({ ...job, match: scoreJobForUser(job, resumeData, prefs) }))
-      .sort((a, b) => b.match.percent - a.match.percent);
+    // No resume AND no Career Digital Twin content — there is nothing to
+    // score against, so a percentage here would be pure noise, not a real
+    // signal. Return jobs unscored rather than show a misleading number.
+    const hasProfile = (resumeData.experience?.length || 0) > 0 || (resumeData.skills?.length || 0) > 0;
 
-    await generateAlerts(user, scored).catch((e) => console.warn('Alert generation failed:', e.message));
+    let scored = hasProfile
+      ? jobs.map((job) => ({ ...job, match: scoreJobForUser(job, resumeData, prefs) }))
+      : jobs.map((job) => ({ ...job, match: null }));
 
-    // Live feeds can return thousands of postings; send only the best matches
-    // to keep the payload sane (descriptions alone are up to 6 KB each).
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 150, 1), 300);
+    if (hasProfile) {
+      await generateAlerts(user, scored).catch((e) => console.warn('Alert generation failed:', e.message));
+    }
+
+    // ---- Server-side search/filter so pagination is correct across the
+    // whole result set, not just whatever page happens to be in view. ----
+    const q = (req.query.q || '').trim().toLowerCase();
+    if (q) {
+      scored = scored.filter((j) =>
+        `${j.title} ${j.company} ${j.location} ${(j.skills || []).join(' ')}`.toLowerCase().includes(q)
+      );
+    }
+    const remoteFilter = req.query.remote;
+    if (remoteFilter && remoteFilter !== 'any') scored = scored.filter((j) => j.remote === remoteFilter);
+    const countryFilter = req.query.country;
+    if (countryFilter && countryFilter !== 'any') scored = scored.filter((j) => (j.countries || []).includes(countryFilter));
+    const regionFilter = req.query.region;
+    if (regionFilter && regionFilter !== 'any') scored = scored.filter((j) => (j.regions || []).includes(regionFilter));
+    const minMatch = parseInt(req.query.minMatch, 10) || 0;
+    if (minMatch > 0) scored = scored.filter((j) => (j.match?.percent ?? 0) >= minMatch);
+
+    const sortBy = req.query.sortBy || 'match';
+    scored.sort((a, b) => {
+      if (sortBy === 'salary') return (b.salaryMax ?? 0) - (a.salaryMax ?? 0);
+      if (sortBy === 'date') return new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime();
+      return (b.match?.percent ?? 0) - (a.match?.percent ?? 0);
+    });
+
+    // ---- Pagination — 10 lightweight summaries per page by default. ----
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 10, 1), 50);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const totalMatched = scored.length;
+    const totalPages = Math.max(1, Math.ceil(totalMatched / pageSize));
+    const pageJobs = scored.slice((page - 1) * pageSize, page * pageSize).map(toSummary);
 
     res.json({
-      jobs: scored.slice(0, limit),
-      totalMatched: scored.length,
+      jobs: pageJobs,
+      page,
+      pageSize,
+      totalPages,
+      totalMatched,
       resumeId,
+      hasProfile,
       sampleData: usingSampleData(),
       preferences: prefs,
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /jobs/detail/:id — full posting detail (including description),
+// fetched only when a user actually opens a job card. Keeps the list
+// endpoint lightweight. (A distinct sub-path, not a bare `/jobs/:id`
+// wildcard, so it can never shadow `/jobs/saved`, `/jobs/radar`, etc.
+// regardless of route registration order.)
+router.get('/detail/:id', async (req, res) => {
+  try {
+    const job = await getJobById(req.params.id);
+    if (!job) return res.status(404).json({ message: 'This job is no longer available.' });
+    res.json(job);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -150,6 +212,7 @@ const saveJobSchema = Joi.object({
   job: Joi.object({
     id: Joi.string().max(200).required(),
     provider: Joi.string().max(60).required(),
+    source: Joi.string().allow('').max(60).default(''),
     title: Joi.string().max(300).required(),
     company: Joi.string().max(300).required(),
     location: Joi.string().allow('').max(300).default(''),
@@ -259,6 +322,19 @@ router.get('/radar', async (req, res) => {
     const { user, resumeData, resumeId } = await getContext(req.user.userId, req.query.resumeId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    const hasProfile = (resumeData.experience?.length || 0) > 0 || (resumeData.skills?.length || 0) > 0;
+    if (!hasProfile) {
+      return res.json({
+        hasProfile: false,
+        qualifyNow: [],
+        qualifySoon: [],
+        companiesHiring: [],
+        adjacentPaths: [],
+        resumeId,
+        sampleData: usingSampleData(),
+      });
+    }
+
     const jobs = await fetchAllJobs();
     const prefs = user.jobPreferences?.toObject ? user.jobPreferences.toObject() : (user.jobPreferences || {});
     const scored = jobs.map((job) => ({ ...job, match: scoreJobForUser(job, resumeData, prefs) }));
@@ -303,6 +379,7 @@ router.get('/radar', async (req, res) => {
     }).filter((a) => a.openings.length > 0);
 
     res.json({
+      hasProfile: true,
       qualifyNow,
       qualifySoon,
       companiesHiring,

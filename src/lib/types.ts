@@ -170,9 +170,19 @@ export interface ScanHistoryItem {
 export interface JobPreferences {
   titles: string[];
   skills: string[];
+  /** Legacy freeform location tags — structured fields below take priority. */
   locations: string[];
+  /** ISO country codes, e.g. ['US','CA']. */
+  countries: string[];
+  caProvinces: string[];
+  usStates: string[];
+  /** Freeform city/area names, matched against each job's location text. */
+  cities: string[];
   workType: 'any' | 'full-time' | 'part-time' | 'contract' | 'internship';
+  /** @deprecated single-select kept for old clients — use remoteTypes. */
   remote: 'any' | 'remote' | 'hybrid' | 'onsite';
+  /** Multi-select work style. Empty = open to any. */
+  remoteTypes: ('remote' | 'hybrid' | 'onsite')[];
   salaryMin?: number | null;
   salaryMax?: number | null;
   alertsEnabled: boolean;
@@ -184,8 +194,13 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
   titles: [],
   skills: [],
   locations: [],
+  countries: [],
+  caProvinces: [],
+  usStates: [],
+  cities: [],
   workType: 'any',
   remote: 'any',
+  remoteTypes: [],
   salaryMin: null,
   salaryMax: null,
   alertsEnabled: true,
@@ -196,6 +211,8 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
 export interface Job {
   id: string;
   provider: string;
+  /** Human-readable feed name, e.g. "Greenhouse" / "Lever" / "Ashby" / "Sample Data". */
+  source?: string;
   title: string;
   company: string;
   location: string;
@@ -212,12 +229,14 @@ export interface Job {
   regions?: string[];
   postedAt?: string;
   isSampleData: boolean;
+  /** Absent/null when the user has no resume or Career Digital Twin content
+   * to score against — never show a percentage in that case. */
   match?: {
     percent: number;
     matchedSkills: string[];
     missingSkills: string[];
     reasons: string[];
-  };
+  } | null;
 }
 
 export type SavedJobStatus = 'saved' | 'applied' | 'interviewing' | 'offer' | 'rejected';
@@ -433,6 +452,7 @@ export interface RadarJob extends Job {
 }
 
 export interface OpportunityRadar {
+  hasProfile: boolean;
   qualifyNow: RadarJob[];
   qualifySoon: RadarJob[];
   companiesHiring: { company: string; jobCount: number; avgMatch: number }[];

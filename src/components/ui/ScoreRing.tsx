@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 export function scoreColor(score: number): string {
   if (score >= 80) return '#059669'; // emerald-600
@@ -9,12 +10,24 @@ export function scoreColor(score: number): string {
   return '#dc2626'; // red-600
 }
 
+/** English fallback label — prefer `useScoreLabel()` in components for a translated string. */
 export function scoreLabel(score: number): string {
   if (score >= 85) return 'Excellent';
   if (score >= 70) return 'Strong';
   if (score >= 55) return 'Good';
   if (score >= 40) return 'Needs work';
   return 'Weak';
+}
+
+export function useScoreLabel() {
+  const { t } = useLocale();
+  return (score: number): string => {
+    if (score >= 85) return t('common.scoreExcellent');
+    if (score >= 70) return t('common.scoreStrong');
+    if (score >= 55) return t('common.scoreGood');
+    if (score >= 40) return t('common.scoreNeedsWork');
+    return t('common.scoreWeak');
+  };
 }
 
 interface ScoreRingProps {
@@ -32,6 +45,8 @@ export default function ScoreRing({
   label,
   animate = true,
 }: ScoreRingProps) {
+  const { t } = useLocale();
+  const getScoreLabel = useScoreLabel();
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   const [display, setDisplay] = useState(animate ? 0 : clamped);
 
@@ -63,7 +78,7 @@ export default function ScoreRing({
       className="relative inline-flex items-center justify-center"
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`${label || 'Score'}: ${clamped} out of 100`}
+      aria-label={t('common.ariaScoreLabel', { label: label || t('common.scoreDefaultLabel'), score: clamped })}
     >
       <svg width={size} height={size} className="-rotate-90">
         <circle
@@ -92,7 +107,7 @@ export default function ScoreRing({
           {display}
         </span>
         <span className="text-xs font-medium" style={{ color }}>
-          {label || scoreLabel(clamped)}
+          {label || getScoreLabel(clamped)}
         </span>
       </div>
     </div>

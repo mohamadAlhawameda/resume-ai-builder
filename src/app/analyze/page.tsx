@@ -22,7 +22,7 @@ import clsx from 'clsx';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge, { scoreTone } from '@/components/ui/Badge';
-import ScoreRing, { scoreLabel } from '@/components/ui/ScoreRing';
+import ScoreRing, { useScoreLabel } from '@/components/ui/ScoreRing';
 import ScoreBar from '@/components/ui/ScoreBar';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
@@ -39,6 +39,7 @@ import {
   type ImportResumeResult,
   type AtsPreviewResult,
 } from '@/lib/types';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 type Tab = 'scan' | 'match' | 'ats';
 
@@ -52,6 +53,8 @@ interface PendingJobMeta {
 function AnalyzeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, formatDate } = useLocale();
+  const getScoreLabel = useScoreLabel();
   const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'scan');
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
   const [selectedResume, setSelectedResume] = useState<string>('');
@@ -126,7 +129,7 @@ function AnalyzeContent() {
   const runScan = async (resumeIdOverride?: string) => {
     const resumeId = resumeIdOverride || selectedResume;
     if (!resumeId) {
-      toast.info('Create a resume first, then scan it.');
+      toast.info(t('analyzePage.toastCreateResumeScan'));
       return;
     }
     setScanning(true);
@@ -140,7 +143,7 @@ function AnalyzeContent() {
       setExpanded(null);
       refreshHistory();
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Scan failed — is the backend up to date?'));
+      toast.error(apiErrorMessage(err, t('analyzePage.toastScanFailed')));
     } finally {
       setScanning(false);
     }
@@ -158,11 +161,11 @@ function AnalyzeContent() {
 
   const runMatch = async () => {
     if (!selectedResume) {
-      toast.info('Create a resume first.');
+      toast.info(t('analyzePage.toastCreateResumeFirst'));
       return;
     }
     if (jobDescription.trim().length < 60) {
-      toast.info('Paste the full job description (at least a few sentences).');
+      toast.info(t('analyzePage.toastPasteJD'));
       return;
     }
     setMatching(true);
@@ -183,7 +186,7 @@ function AnalyzeContent() {
       setMatch(result);
       refreshHistory();
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Comparison failed — please try again.'));
+      toast.error(apiErrorMessage(err, t('analyzePage.toastCompareFailed')));
     } finally {
       setMatching(false);
     }
@@ -191,7 +194,7 @@ function AnalyzeContent() {
 
   const runAtsPreview = async () => {
     if (!selectedResume) {
-      toast.info('Create a resume first.');
+      toast.info(t('analyzePage.toastCreateResumeFirst'));
       return;
     }
     setAtsLoading(true);
@@ -203,7 +206,7 @@ function AnalyzeContent() {
       });
       setAtsPreview(result);
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Could not generate the ATS preview.'));
+      toast.error(apiErrorMessage(err, t('analyzePage.toastAtsFailed')));
     } finally {
       setAtsLoading(false);
     }
@@ -224,24 +227,21 @@ function AnalyzeContent() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Resume Analyzer</h1>
-        <p className="text-slate-500 mt-1 text-sm sm:text-base max-w-2xl">
-          Get an objective score out of 100 across nine categories, or paste a job posting to see
-          exactly how well your resume matches — and what to fix.
-        </p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('analyzePage.title')}</h1>
+        <p className="text-slate-500 mt-1 text-sm sm:text-base max-w-2xl">{t('analyzePage.subtitle')}</p>
       </div>
 
       {resumes.length === 0 ? (
         <Card>
           <EmptyState
             icon={<FileText className="w-6 h-6" />}
-            title="Start with your resume"
-            description="Upload the resume you already have (PDF or DOCX) and we'll parse and score it instantly — or build one from scratch."
+            title={t('analyzePage.startTitle')}
+            description={t('analyzePage.startDesc')}
             action={
               <div className="flex flex-col sm:flex-row gap-2 items-center justify-center">
                 <ImportResumeButton variant="primary" onImported={handleImported} />
                 <Button variant="outline" onClick={() => router.push('/resume')}>
-                  Create from scratch
+                  {t('analyzePage.createFromScratch')}
                 </Button>
               </div>
             }
@@ -255,7 +255,7 @@ function AnalyzeContent() {
               <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
                 <div className="flex-1">
                   <label htmlFor="resumeSelect" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Resume to analyze
+                    {t('analyzePage.resumeToAnalyze')}
                   </label>
                   <select
                     id="resumeSelect"
@@ -265,17 +265,17 @@ function AnalyzeContent() {
                   >
                     {resumes.map((r) => (
                       <option key={r._id} value={r._id}>
-                        {r.title || r.data?.fullName || 'Untitled resume'}
+                        {r.title || r.data?.fullName || t('analyzePage.untitledResume')}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div className="flex rounded-xl border border-slate-200 p-1 bg-slate-50" role="tablist" aria-label="Analysis type">
+                <div className="flex rounded-xl border border-slate-200 p-1 bg-slate-50" role="tablist" aria-label={t('analyzePage.ariaAnalysisType')}>
                   {(
                     [
-                      { id: 'scan', label: 'Resume scan', icon: ScanSearch },
-                      { id: 'match', label: 'Job match', icon: Briefcase },
-                      { id: 'ats', label: 'ATS preview', icon: FileText },
+                      { id: 'scan', label: t('analyzePage.tabScan'), icon: ScanSearch },
+                      { id: 'match', label: t('analyzePage.tabMatch'), icon: Briefcase },
+                      { id: 'ats', label: t('analyzePage.tabAts'), icon: FileText },
                     ] as const
                   ).map(({ id, label, icon: Icon }) => (
                     <button
@@ -299,26 +299,26 @@ function AnalyzeContent() {
                 <div className="mt-4 space-y-3">
                   <div>
                     <label htmlFor="jobTitle" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Job title <span className="text-slate-400 font-normal">(optional)</span>
+                      {t('analyzePage.jobTitleLabel')} <span className="text-slate-400 font-normal">{t('analyzePage.optional')}</span>
                     </label>
                     <input
                       id="jobTitle"
                       value={jobTitle}
                       onChange={(e) => setJobTitle(e.target.value)}
-                      placeholder="e.g. Senior Frontend Developer"
+                      placeholder={t('analyzePage.jobTitlePlaceholder')}
                       className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
                     <label htmlFor="jobDescription" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Job description
+                      {t('analyzePage.jobDescriptionLabel')}
                     </label>
                     <textarea
                       id="jobDescription"
                       rows={7}
                       value={jobDescription}
                       onChange={(e) => setJobDescription(e.target.value)}
-                      placeholder="Paste the full job posting here…"
+                      placeholder={t('analyzePage.jobDescriptionPlaceholder')}
                       className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
                     />
                   </div>
@@ -328,20 +328,20 @@ function AnalyzeContent() {
               <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
                 {tab === 'scan' && (
                   <Button icon={<ScanSearch className="w-4 h-4" />} loading={scanning} onClick={() => runScan()} size="lg">
-                    {scanning ? 'Scanning…' : 'Scan my resume'}
+                    {scanning ? t('analyzePage.scanning') : t('analyzePage.scanButton')}
                   </Button>
                 )}
                 {tab === 'match' && (
                   <Button icon={<Briefcase className="w-4 h-4" />} loading={matching} onClick={runMatch} size="lg">
-                    {matching ? 'Comparing…' : 'Compare with job'}
+                    {matching ? t('analyzePage.comparing') : t('analyzePage.compareButton')}
                   </Button>
                 )}
                 {tab === 'ats' && (
                   <Button icon={<FileText className="w-4 h-4" />} loading={atsLoading} onClick={runAtsPreview} size="lg">
-                    {atsLoading ? 'Analyzing…' : 'Preview ATS parsing'}
+                    {atsLoading ? t('analyzePage.analyzing') : t('analyzePage.atsButton')}
                   </Button>
                 )}
-                <ImportResumeButton onImported={handleImported} label="Import another resume" />
+                <ImportResumeButton onImported={handleImported} label={t('analyzePage.importAnother')} />
               </div>
             </Card>
 
@@ -352,12 +352,13 @@ function AnalyzeContent() {
                   <div>
                     <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                       <FileText className="w-4 h-4 text-blue-600" aria-hidden />
-                      Imported “{importInfo.resume.title || 'resume'}”
+                      {t('analyzePage.importedTitle', { title: importInfo.resume.title || t('analyzePage.resumeFallback') })}
                     </h3>
                     <p className="text-sm text-slate-600 mt-1">
-                      We detected {importInfo.confidence}% of the core sections
-                      {importInfo.aiUsed ? ' (AI-assisted parsing — only text from your file was used)' : ''}. Please
-                      review the details before applying to jobs.
+                      {t('analyzePage.detectedText', {
+                        pct: importInfo.confidence,
+                        aiSuffix: importInfo.aiUsed ? t('analyzePage.aiAssistedSuffix') : '',
+                      })}
                     </p>
                     {importInfo.warnings.length > 0 && (
                       <ul className="mt-2 space-y-1">
@@ -371,7 +372,7 @@ function AnalyzeContent() {
                     )}
                   </div>
                   <Button size="sm" variant="outline" onClick={() => router.push(`/resume/edit/${importInfo.resume._id}`)}>
-                    Review in builder <ArrowRight className="w-3.5 h-3.5" />
+                    {t('analyzePage.reviewInBuilder')} <ArrowRight className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               </Card>
@@ -386,7 +387,7 @@ function AnalyzeContent() {
                       <ScoreRing score={scan.overall} size={150} />
                       <div className="flex-1 text-center sm:text-left">
                         <h2 className="text-xl font-bold text-slate-900">
-                          Your resume scores {scan.overall}/100 — {scoreLabel(scan.overall).toLowerCase()}
+                          {t('analyzePage.scoresHeadline', { score: scan.overall, label: getScoreLabel(scan.overall).toLowerCase() })}
                         </h2>
                         {scan.strengths.length > 0 && (
                           <ul className="mt-3 space-y-1.5">
@@ -404,7 +405,7 @@ function AnalyzeContent() {
 
                   {/* Category breakdown */}
                   <Card>
-                    <h3 className="font-semibold text-slate-900 mb-4">Category breakdown</h3>
+                    <h3 className="font-semibold text-slate-900 mb-4">{t('analyzePage.categoryBreakdown')}</h3>
                     <div className="space-y-2">
                       {scan.categories.map((cat) => (
                         <div key={cat.key} className="border border-slate-100 rounded-xl">
@@ -445,7 +446,7 @@ function AnalyzeContent() {
                                     </ul>
                                   ) : (
                                     <p className="text-sm text-emerald-600 flex items-center gap-1.5">
-                                      <CheckCircle2 className="w-4 h-4" aria-hidden /> Looking great — nothing to fix here.
+                                      <CheckCircle2 className="w-4 h-4" aria-hidden /> {t('analyzePage.lookingGreat')}
                                     </p>
                                   )}
                                 </div>
@@ -461,7 +462,7 @@ function AnalyzeContent() {
                   {scan.topFixes.length > 0 && (
                     <Card>
                       <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden /> Fix these first
+                        <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden /> {t('analyzePage.fixTheseFirst')}
                       </h3>
                       <ol className="space-y-2.5 list-none">
                         {scan.topFixes.map((fix, i) => (
@@ -474,7 +475,7 @@ function AnalyzeContent() {
                         ))}
                       </ol>
                       <Button className="mt-4" variant="outline" size="sm" onClick={() => router.push(selectedResume ? `/resume/edit/${selectedResume}` : '/resume')}>
-                        Open in builder <ArrowRight className="w-3.5 h-3.5" />
+                        {t('analyzePage.openInBuilder')} <ArrowRight className="w-3.5 h-3.5" />
                       </Button>
                     </Card>
                   )}
@@ -482,10 +483,8 @@ function AnalyzeContent() {
                   {/* Language findings */}
                   {scan.languageFindings.length > 0 && (
                     <Card>
-                      <h3 className="font-semibold text-slate-900 mb-3">Language check</h3>
-                      <p className="text-sm text-slate-500 mb-4">
-                        Weak phrases, filler words, repetition, passive voice and possible spelling issues found in your resume.
-                      </p>
+                      <h3 className="font-semibold text-slate-900 mb-3">{t('analyzePage.languageCheck')}</h3>
+                      <p className="text-sm text-slate-500 mb-4">{t('analyzePage.languageCheckDesc')}</p>
                       <div className="space-y-2.5">
                         {scan.languageFindings.map((f, i) => (
                           <div key={i} className="flex items-start gap-3 text-sm">
@@ -510,7 +509,7 @@ function AnalyzeContent() {
                   {scan.actionVerbSuggestions.length > 0 && (
                     <Card>
                       <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-purple-500" aria-hidden /> Strong action verbs to use
+                        <Sparkles className="w-4 h-4 text-purple-500" aria-hidden /> {t('analyzePage.strongActionVerbs')}
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {scan.actionVerbSuggestions.map((v) => (
@@ -529,10 +528,13 @@ function AnalyzeContent() {
                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                   <Card>
                     <div className="flex flex-col sm:flex-row items-center gap-6">
-                      <ScoreRing score={match.matchPercent} size={150} label="Match" />
+                      <ScoreRing score={match.matchPercent} size={150} label={t('analyzePage.matchLabel')} />
                       <div className="flex-1 text-center sm:text-left">
                         <h2 className="text-xl font-bold text-slate-900">
-                          {match.matchPercent}% match{match.jobTitle ? ` — ${match.jobTitle}` : ''}
+                          {t('analyzePage.matchHeadline', {
+                            percent: match.matchPercent,
+                            titleSuffix: match.jobTitle ? ` — ${match.jobTitle}` : '',
+                          })}
                         </h2>
                         <p className="text-sm text-slate-600 mt-2">{match.summary}</p>
                       </div>
@@ -541,7 +543,7 @@ function AnalyzeContent() {
 
                   {match.subScores && (
                     <Card>
-                      <h3 className="font-semibold text-slate-900 mb-3">Qualification breakdown</h3>
+                      <h3 className="font-semibold text-slate-900 mb-3">{t('analyzePage.qualificationBreakdown')}</h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {(
                           Object.entries(match.subScores) as [string, number][]
@@ -568,9 +570,9 @@ function AnalyzeContent() {
 
                   <div className="grid sm:grid-cols-2 gap-6">
                     <Card>
-                      <h3 className="font-semibold text-slate-900 mb-3">✓ You already match</h3>
+                      <h3 className="font-semibold text-slate-900 mb-3">{t('analyzePage.alreadyMatch')}</h3>
                       {match.matchedSkills.length + match.matchedKeywords.length === 0 ? (
-                        <p className="text-sm text-slate-500">No direct matches found.</p>
+                        <p className="text-sm text-slate-500">{t('analyzePage.noDirectMatches')}</p>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
                           {match.matchedSkills.map((s) => (
@@ -583,9 +585,9 @@ function AnalyzeContent() {
                       )}
                     </Card>
                     <Card>
-                      <h3 className="font-semibold text-slate-900 mb-3">✗ Missing from your resume</h3>
+                      <h3 className="font-semibold text-slate-900 mb-3">{t('analyzePage.missingFromResume')}</h3>
                       {match.missingSkills.length + match.missingKeywords.length === 0 ? (
-                        <p className="text-sm text-emerald-600">Nothing important is missing — great coverage!</p>
+                        <p className="text-sm text-emerald-600">{t('analyzePage.nothingMissing')}</p>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
                           {match.missingSkills.map((s) => (
@@ -602,7 +604,7 @@ function AnalyzeContent() {
                   {match.missingQualifications.length > 0 && (
                     <Card>
                       <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden /> Requirements to address
+                        <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden /> {t('analyzePage.requirementsToAddress')}
                       </h3>
                       <ul className="space-y-2">
                         {match.missingQualifications.map((q, i) => (
@@ -616,7 +618,7 @@ function AnalyzeContent() {
 
                   {match.keywordPlan.length > 0 && (
                     <Card>
-                      <h3 className="font-semibold text-slate-900 mb-3">Keyword plan (no stuffing)</h3>
+                      <h3 className="font-semibold text-slate-900 mb-3">{t('analyzePage.keywordPlanTitle')}</h3>
                       <ul className="space-y-2.5">
                         {match.keywordPlan.map((tip, i) => (
                           <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
@@ -631,11 +633,9 @@ function AnalyzeContent() {
                   {match.bulletRewrites.length > 0 && (
                     <Card>
                       <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-purple-500" aria-hidden /> Bullet rewrites for this job
+                        <Sparkles className="w-4 h-4 text-purple-500" aria-hidden /> {t('analyzePage.bulletRewritesTitle')}
                       </h3>
-                      <p className="text-sm text-slate-500 mb-4">
-                        Copy the improved versions into the builder — only where they truthfully describe your work.
-                      </p>
+                      <p className="text-sm text-slate-500 mb-4">{t('analyzePage.bulletRewritesDesc')}</p>
                       <div className="space-y-4">
                         {match.bulletRewrites.map((rw, i) => (
                           <div key={i} className="border border-slate-200 rounded-xl p-4">
@@ -654,11 +654,8 @@ function AnalyzeContent() {
 
                   {match.evidenceMap && match.evidenceMap.length > 0 && (
                     <Card>
-                      <h3 className="font-semibold text-slate-900 mb-1">Qualification Evidence Map</h3>
-                      <p className="text-sm text-slate-500 mb-4">
-                        Every requirement in the posting, linked to the exact evidence in your resume — or flagged as
-                        not found.
-                      </p>
+                      <h3 className="font-semibold text-slate-900 mb-1">{t('analyzePage.evidenceMapTitle')}</h3>
+                      <p className="text-sm text-slate-500 mb-4">{t('analyzePage.evidenceMapDesc')}</p>
                       <div className="space-y-2">
                         {match.evidenceMap.map((e, i) => (
                           <div key={i} className="flex items-start gap-3 border border-slate-100 rounded-xl p-3">
@@ -668,7 +665,7 @@ function AnalyzeContent() {
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-slate-900">{e.requirement}</p>
                               <p className="text-xs text-slate-500 mt-0.5">
-                                {e.evidence ? `Evidence: “${e.evidence}”` : 'Not found in your resume.'}
+                                {e.evidence ? t('analyzePage.evidenceText', { evidence: e.evidence }) : t('analyzePage.notFoundText')}
                               </p>
                             </div>
                           </div>
@@ -683,12 +680,12 @@ function AnalyzeContent() {
               {tab === 'ats' && atsPreview && (
                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                   <Card>
-                    <h3 className="font-semibold text-slate-900 mb-3">Recruiter&apos;s first 6 seconds</h3>
+                    <h3 className="font-semibold text-slate-900 mb-3">{t('analyzePage.recruiterFirstImpression')}</h3>
                     <div className="space-y-1.5 text-sm text-slate-700">
-                      <p><span className="text-slate-500">Name:</span> {atsPreview.recruiterFirstImpression.name}</p>
-                      <p><span className="text-slate-500">Headline:</span> {atsPreview.recruiterFirstImpression.headline || '—'}</p>
+                      <p><span className="text-slate-500">{t('analyzePage.nameLabel')}</span> {atsPreview.recruiterFirstImpression.name}</p>
+                      <p><span className="text-slate-500">{t('analyzePage.headlineLabel2')}</span> {atsPreview.recruiterFirstImpression.headline || '—'}</p>
                       {atsPreview.recruiterFirstImpression.mostRecentRole && (
-                        <p><span className="text-slate-500">Most recent role:</span> {atsPreview.recruiterFirstImpression.mostRecentRole}</p>
+                        <p><span className="text-slate-500">{t('analyzePage.mostRecentRoleLabel')}</span> {atsPreview.recruiterFirstImpression.mostRecentRole}</p>
                       )}
                     </div>
                     {atsPreview.recruiterFirstImpression.topBullets.length > 0 && (
@@ -712,7 +709,7 @@ function AnalyzeContent() {
                   {atsPreview.flags.length > 0 && (
                     <Card>
                       <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden /> Formatting risks
+                        <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden /> {t('analyzePage.formattingRisks')}
                       </h3>
                       <div className="space-y-2">
                         {atsPreview.flags.map((f, i) => (
@@ -728,7 +725,7 @@ function AnalyzeContent() {
                   )}
 
                   <Card>
-                    <h3 className="font-semibold text-slate-900 mb-3">What an ATS parser extracts</h3>
+                    <h3 className="font-semibold text-slate-900 mb-3">{t('analyzePage.atsExtractsTitle')}</h3>
                     <div className="space-y-3 max-h-96 overflow-y-auto thin-scrollbar">
                       {atsPreview.sections.map((s, i) => (
                         <div key={i} className="border border-slate-100 rounded-xl p-3">
@@ -747,22 +744,20 @@ function AnalyzeContent() {
           <Card padded={false} className="lg:sticky lg:top-20">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
               <History className="w-4 h-4 text-slate-400" aria-hidden />
-              <h2 className="font-semibold text-slate-900">Scan history</h2>
+              <h2 className="font-semibold text-slate-900">{t('analyzePage.scanHistoryTitle')}</h2>
             </div>
             {history.length === 0 ? (
-              <p className="px-5 py-8 text-sm text-slate-500 text-center">
-                Your scans will appear here so you can track improvement over time.
-              </p>
+              <p className="px-5 py-8 text-sm text-slate-500 text-center">{t('analyzePage.noHistoryText')}</p>
             ) : (
               <ul className="divide-y divide-slate-50 max-h-[60vh] overflow-y-auto thin-scrollbar">
                 {history.map((h) => (
                   <li key={h._id} className="px-5 py-3 flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">
-                        {h.type === 'scan' ? 'Resume scan' : h.jobTitle || 'Job match'}
+                        {h.type === 'scan' ? t('analyzePage.resumeScanLabel') : h.jobTitle || t('analyzePage.jobMatchFallback')}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {new Date(h.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatDate(h.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
                     <Badge tone={scoreTone(h.overall ?? h.matchPercent ?? 0)}>
@@ -774,7 +769,7 @@ function AnalyzeContent() {
             )}
             <div className="px-5 py-3 border-t border-slate-100">
               <Link href="/tools" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
-                Generate a cover letter <ArrowRight className="w-3.5 h-3.5" />
+                {t('analyzePage.generateCoverLetter')} <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </Card>

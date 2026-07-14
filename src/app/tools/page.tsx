@@ -27,6 +27,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
 import type { ResumeRecord, InterviewQuestion } from '@/lib/types';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 type Tool =
   | 'cover-letter'
@@ -48,65 +49,65 @@ interface ToolFields {
 
 const TOOLS: {
   id: Tool;
-  label: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
-  description: string;
+  descKey: string;
   fields: ToolFields;
 }[] = [
   {
     id: 'cover-letter',
-    label: 'Cover Letter',
+    labelKey: 'toolsPage.toolCoverLetterLabel',
     icon: Mail,
-    description: 'A tailored cover letter grounded in your resume and the job you are applying to.',
+    descKey: 'toolsPage.toolCoverLetterDesc',
     fields: { job: true, jd: true, tone: true },
   },
   {
     id: 'interview-prep',
-    label: 'Interview Prep',
+    labelKey: 'toolsPage.toolInterviewPrepLabel',
     icon: MessagesSquare,
-    description: 'Likely interview questions for this job, each with a STAR-method preparation hint.',
+    descKey: 'toolsPage.toolInterviewPrepDesc',
     fields: { job: true, jd: true },
   },
   {
     id: 'recruiter-message',
-    label: 'Recruiter Message',
+    labelKey: 'toolsPage.toolRecruiterMessageLabel',
     icon: Send,
-    description: 'A short outreach or referral-request message about a specific opening.',
+    descKey: 'toolsPage.toolRecruiterMessageDesc',
     fields: { job: true, jd: true, recipient: true, tone: true },
   },
   {
     id: 'follow-up-email',
-    label: 'Follow-up Email',
+    labelKey: 'toolsPage.toolFollowUpLabel',
     icon: Reply,
-    description: 'A polite nudge when an application has gone quiet.',
+    descKey: 'toolsPage.toolFollowUpDesc',
     fields: { job: true, recipient: true, tone: true },
   },
   {
     id: 'thank-you-email',
-    label: 'Thank-you Email',
+    labelKey: 'toolsPage.toolThankYouLabel',
     icon: MailCheck,
-    description: 'A post-interview thank-you note that reinforces your fit.',
+    descKey: 'toolsPage.toolThankYouDesc',
     fields: { job: true, recipient: true, tone: true },
   },
   {
     id: 'linkedin-summary',
-    label: 'LinkedIn Summary',
+    labelKey: 'toolsPage.toolLinkedinSummaryLabel',
     icon: Linkedin,
-    description: 'A first-person "About" section for your LinkedIn profile.',
+    descKey: 'toolsPage.toolLinkedinSummaryDesc',
     fields: { targetRole: true, tone: true },
   },
   {
     id: 'linkedin-headline',
-    label: 'LinkedIn Headline',
+    labelKey: 'toolsPage.toolLinkedinHeadlineLabel',
     icon: Type,
-    description: 'Keyword-rich headline options for the top of your profile.',
+    descKey: 'toolsPage.toolLinkedinHeadlineDesc',
     fields: { targetRole: true },
   },
   {
     id: 'bio',
-    label: 'Professional Bio',
+    labelKey: 'toolsPage.toolBioLabel',
     icon: User,
-    description: 'A short third-person bio for portfolios, talks, or team pages.',
+    descKey: 'toolsPage.toolBioDesc',
     fields: {},
   },
 ];
@@ -114,6 +115,7 @@ const TOOLS: {
 function ToolsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
   const [tool, setTool] = useState<Tool>((searchParams.get('tool') as Tool) || 'cover-letter');
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
   const [selectedResume, setSelectedResume] = useState('');
@@ -141,7 +143,7 @@ function ToolsContent() {
         setResumes(data);
         if (data.length > 0) setSelectedResume(data[0]._id);
       })
-      .catch((err) => toast.error(apiErrorMessage(err, 'Could not load resumes.')))
+      .catch((err) => toast.error(apiErrorMessage(err, t('toolsPage.toastLoadResumesError'))))
       .finally(() => setLoading(false));
 
     // Prefill from job discovery ("Cover letter" / "Interview prep" on a job card)
@@ -153,19 +155,20 @@ function ToolsContent() {
         setCompany(parsed.company || '');
         setJobDescription(parsed.jobDescription || '');
         const requested = searchParams.get('tool') as Tool | null;
-        if (!requested || !TOOLS.some((t) => t.id === requested)) setTool('cover-letter');
+        if (!requested || !TOOLS.some((tl) => tl.id === requested)) setTool('cover-letter');
       } catch {
         /* ignore */
       }
       sessionStorage.removeItem('tools:jobContext');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, searchParams]);
 
   const resume = resumes.find((r) => r._id === selectedResume);
 
   const generate = async () => {
     if (!resume) {
-      toast.info('Create a resume first — the generators are grounded in it.');
+      toast.info(t('toolsPage.toastCreateResumeFirst'));
       return;
     }
     setGenerating(true);
@@ -198,10 +201,10 @@ function ToolsContent() {
       }
       setAiUsed(res.aiUsed !== false);
       if (res.aiUsed === false) {
-        toast.info('AI is not configured on the server — this is a starter template to edit.');
+        toast.info(t('toolsPage.toastAiNotConfigured'));
       }
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Generation failed — please try again.'));
+      toast.error(apiErrorMessage(err, t('toolsPage.toastGenerationFailed')));
     } finally {
       setGenerating(false);
     }
@@ -209,7 +212,7 @@ function ToolsContent() {
 
   const copyOutput = async () => {
     await navigator.clipboard.writeText(output);
-    toast.success('Copied to clipboard');
+    toast.success(t('toolsPage.toastCopied'));
   };
 
   const downloadOutput = () => {
@@ -222,7 +225,7 @@ function ToolsContent() {
     URL.revokeObjectURL(url);
   };
 
-  const activeTool = TOOLS.find((t) => t.id === tool)!;
+  const activeTool = TOOLS.find((tl) => tl.id === tool)!;
 
   if (loading) {
     return (
@@ -236,26 +239,24 @@ function ToolsContent() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">AI Writing Tools</h1>
-        <p className="text-slate-500 mt-1 text-sm sm:text-base">
-          Generate application materials grounded in your actual resume — nothing invented.
-        </p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('toolsPage.title')}</h1>
+        <p className="text-slate-500 mt-1 text-sm sm:text-base">{t('toolsPage.subtitle')}</p>
       </div>
 
       {resumes.length === 0 ? (
         <Card>
           <EmptyState
             icon={<FileText className="w-6 h-6" />}
-            title="You need a resume first"
-            description="These tools are grounded in your resume content. Create one and come back."
-            action={<Button onClick={() => router.push('/resume')}>Create resume</Button>}
+            title={t('toolsPage.needResumeTitle')}
+            description={t('toolsPage.needResumeDescription')}
+            action={<Button onClick={() => router.push('/resume')}>{t('toolsPage.createResume')}</Button>}
           />
         </Card>
       ) : (
         <>
           {/* Tool selector */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" role="tablist" aria-label="Writing tools">
-            {TOOLS.map(({ id, label, icon: Icon, description }) => (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" role="tablist" aria-label={t('toolsPage.ariaWritingTools')}>
+            {TOOLS.map(({ id, labelKey, icon: Icon, descKey }) => (
               <button
                 key={id}
                 role="tab"
@@ -273,8 +274,8 @@ function ToolsContent() {
                 )}
               >
                 <Icon className={clsx('w-5 h-5 mb-2', tool === id ? 'text-blue-600' : 'text-slate-400')} aria-hidden />
-                <p className="font-semibold text-sm text-slate-900">{label}</p>
-                <p className="text-xs text-slate-500 mt-1">{description}</p>
+                <p className="font-semibold text-sm text-slate-900">{t(labelKey)}</p>
+                <p className="text-xs text-slate-500 mt-1">{t(descKey)}</p>
               </button>
             ))}
           </div>
@@ -282,11 +283,11 @@ function ToolsContent() {
           <div className="grid lg:grid-cols-2 gap-6 items-start">
             {/* Inputs */}
             <Card className="space-y-4">
-              <h2 className="font-semibold text-slate-900">{activeTool.label} details</h2>
+              <h2 className="font-semibold text-slate-900">{t('toolsPage.detailsSuffix', { tool: t(activeTool.labelKey) })}</h2>
 
               <div>
                 <label htmlFor="tool-resume" className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Base resume
+                  {t('toolsPage.baseResume')}
                 </label>
                 <select
                   id="tool-resume"
@@ -296,7 +297,7 @@ function ToolsContent() {
                 >
                   {resumes.map((r) => (
                     <option key={r._id} value={r._id}>
-                      {r.title || r.data?.fullName || 'Untitled resume'}
+                      {r.title || r.data?.fullName || t('toolsPage.untitledResume')}
                     </option>
                   ))}
                 </select>
@@ -306,25 +307,25 @@ function ToolsContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="cl-title" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Job title
+                      {t('toolsPage.jobTitleLabel')}
                     </label>
                     <input
                       id="cl-title"
                       value={jobTitle}
                       onChange={(e) => setJobTitle(e.target.value)}
-                      placeholder="e.g. Frontend Developer"
+                      placeholder={t('toolsPage.jobTitlePlaceholder')}
                       className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
                     <label htmlFor="cl-company" className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Company
+                      {t('toolsPage.companyLabel')}
                     </label>
                     <input
                       id="cl-company"
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
-                      placeholder="e.g. Acme Inc."
+                      placeholder={t('toolsPage.companyPlaceholder')}
                       className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -334,13 +335,13 @@ function ToolsContent() {
               {activeTool.fields.recipient && (
                 <div>
                   <label htmlFor="recipient" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Recipient name <span className="text-slate-400 font-normal">(optional)</span>
+                    {t('toolsPage.recipientLabel')} <span className="text-slate-400 font-normal">{t('toolsPage.optional')}</span>
                   </label>
                   <input
                     id="recipient"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
-                    placeholder="e.g. Sarah (the recruiter or interviewer)"
+                    placeholder={t('toolsPage.recipientPlaceholder')}
                     className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -349,14 +350,14 @@ function ToolsContent() {
               {activeTool.fields.jd && (
                 <div>
                   <label htmlFor="cl-jd" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Job description <span className="text-slate-400 font-normal">(recommended)</span>
+                    {t('toolsPage.jdLabel')} <span className="text-slate-400 font-normal">{t('toolsPage.recommended')}</span>
                   </label>
                   <textarea
                     id="cl-jd"
                     rows={6}
                     value={jobDescription}
                     onChange={(e) => setJobDescription(e.target.value)}
-                    placeholder="Paste the job description for a sharper result…"
+                    placeholder={t('toolsPage.jdPlaceholder')}
                     className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
                   />
                 </div>
@@ -365,13 +366,13 @@ function ToolsContent() {
               {activeTool.fields.targetRole && (
                 <div>
                   <label htmlFor="li-role" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Target role <span className="text-slate-400 font-normal">(optional)</span>
+                    {t('toolsPage.targetRoleLabel')} <span className="text-slate-400 font-normal">{t('toolsPage.optional')}</span>
                   </label>
                   <input
                     id="li-role"
                     value={targetRole}
                     onChange={(e) => setTargetRole(e.target.value)}
-                    placeholder="e.g. Full Stack Developer"
+                    placeholder={t('toolsPage.targetRolePlaceholder')}
                     className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -380,7 +381,7 @@ function ToolsContent() {
               {activeTool.fields.tone && (
                 <div>
                   <label htmlFor="tool-tone" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Tone
+                    {t('toolsPage.toneLabel')}
                   </label>
                   <select
                     id="tool-tone"
@@ -388,29 +389,29 @@ function ToolsContent() {
                     onChange={(e) => setTone(e.target.value as typeof tone)}
                     className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="professional">Professional</option>
-                    <option value="confident">Confident</option>
-                    <option value="friendly">Friendly</option>
+                    <option value="professional">{t('toolsPage.toneProfessional')}</option>
+                    <option value="confident">{t('toolsPage.toneConfident')}</option>
+                    <option value="friendly">{t('toolsPage.toneFriendly')}</option>
                   </select>
                 </div>
               )}
 
               <Button icon={<Sparkles className="w-4 h-4" />} loading={generating} onClick={generate} fullWidth size="lg">
-                {generating ? 'Writing…' : `Generate ${activeTool.label.toLowerCase()}`}
+                {generating ? t('toolsPage.writing') : t('toolsPage.generate', { tool: t(activeTool.labelKey).toLowerCase() })}
               </Button>
             </Card>
 
             {/* Output */}
             <Card className="min-h-[300px] flex flex-col">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-slate-900">Result</h2>
+                <h2 className="font-semibold text-slate-900">{t('toolsPage.result')}</h2>
                 {output && (
                   <div className="flex gap-1.5">
                     <Button size="sm" variant="ghost" icon={<Copy className="w-3.5 h-3.5" />} onClick={copyOutput}>
-                      Copy
+                      {t('toolsPage.copy')}
                     </Button>
                     <Button size="sm" variant="ghost" icon={<Download className="w-3.5 h-3.5" />} onClick={downloadOutput}>
-                      .txt
+                      {t('toolsPage.txt')}
                     </Button>
                   </div>
                 )}
@@ -428,8 +429,8 @@ function ToolsContent() {
                   {!aiUsed && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
                       {questions.length > 0
-                        ? 'Standard question set (AI not configured on server) — still worth practicing with your real examples.'
-                        : 'Starter template (AI not configured on server) — fill in the bracketed parts.'}
+                        ? t('toolsPage.aiNotConfiguredQuestions')
+                        : t('toolsPage.aiNotConfiguredTemplate')}
                     </p>
                   )}
                   {questions.length > 0 ? (
@@ -449,7 +450,7 @@ function ToolsContent() {
                           </div>
                           {q.starHint && (
                             <p className="text-xs text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                              <span className="font-semibold text-slate-700">How to prepare (STAR): </span>
+                              <span className="font-semibold text-slate-700">{t('toolsPage.howToPrepare')}</span>
                               {q.starHint}
                             </p>
                           )}
@@ -462,18 +463,16 @@ function ToolsContent() {
                         value={output}
                         onChange={(e) => setOutput(e.target.value)}
                         rows={14}
-                        aria-label="Generated text (editable)"
+                        aria-label={t('toolsPage.generatedTextAria')}
                         className="flex-1 w-full text-sm text-slate-800 leading-relaxed border border-slate-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
                       />
-                      <p className="text-xs text-slate-400 mt-2">Edit freely — this is your voice, AI just drafted it.</p>
+                      <p className="text-xs text-slate-400 mt-2">{t('toolsPage.editFreely')}</p>
                     </>
                   )}
                 </motion.div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-center">
-                  <p className="text-sm text-slate-400 max-w-xs">
-                    Fill in the details and hit generate. The result appears here, ready to edit and copy.
-                  </p>
+                  <p className="text-sm text-slate-400 max-w-xs">{t('toolsPage.fillDetailsPrompt')}</p>
                 </div>
               )}
             </Card>

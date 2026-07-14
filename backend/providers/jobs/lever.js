@@ -6,6 +6,7 @@
 
 import { findSkillsInText } from '../../utils/text.js';
 import { prettyCompanyName } from './companyName.js';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout.js';
 
 function toPlainText(posting) {
   const parts = [posting.descriptionPlain || ''];
@@ -32,8 +33,9 @@ const leverProvider = {
     const results = [];
     for (const company of companies) {
       try {
-        const res = await fetch(
-          `https://api.lever.co/v0/postings/${encodeURIComponent(company)}?mode=json`
+        const res = await fetchWithTimeout(
+          `https://api.lever.co/v0/postings/${encodeURIComponent(company)}?mode=json`,
+          { timeoutMs: 8000 }
         );
         if (!res.ok) {
           console.warn(`Lever company "${company}" returned ${res.status}`);
@@ -46,6 +48,7 @@ const leverProvider = {
           results.push({
             id: `lever:${company}:${p.id}`,
             provider: 'lever',
+            source: 'Lever',
             externalId: p.id,
             title: p.text || 'Untitled role',
             company: prettyCompanyName(company),

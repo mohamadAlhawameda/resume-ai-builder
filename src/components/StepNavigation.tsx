@@ -3,6 +3,7 @@
 import React from 'react';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 interface StepNavigationProps {
   steps: string[];
@@ -11,8 +12,9 @@ interface StepNavigationProps {
 }
 
 export default function StepNavigation({ steps, currentStep, onStepChange }: StepNavigationProps) {
+  const { t } = useLocale();
   return (
-    <nav className="flex flex-wrap gap-2 mb-6" aria-label="Form steps">
+    <nav className="flex flex-wrap gap-2 mb-6" aria-label={t('builderPage.formStepsAria')}>
       {steps.map((label, i) => {
         const done = i < currentStep;
         const active = currentStep === i;

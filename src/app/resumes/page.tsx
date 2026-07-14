@@ -31,26 +31,25 @@ import {
   type ResumeVersion,
   type TemplateId,
 } from '@/lib/types';
-
-const formatDate = (dateStr?: string) =>
-  dateStr
-    ? new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-    : '';
-
-const formatDateTime = (dateStr?: string) =>
-  dateStr
-    ? new Date(dateStr).toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : '';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 type WithScore = ResumeRecord & { lastScore?: number | null };
 
 export default function ResumesPage() {
   const router = useRouter();
+  const { t, formatDate, locale } = useLocale();
+  const formatDateTime = useCallback(
+    (dateStr?: string) =>
+      dateStr
+        ? new Intl.DateTimeFormat(locale === 'ar' ? 'ar' : locale === 'fr' ? 'fr-CA' : 'en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          }).format(new Date(dateStr))
+        : '',
+    [locale]
+  );
   const [resumes, setResumes] = useState<WithScore[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,11 +69,11 @@ export default function ResumesPage() {
       const data = await api<WithScore[]>('/resume/resumes');
       setResumes(data);
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Could not load your resumes.'));
+      toast.error(apiErrorMessage(err, t('resumesPage.toastLoadError')));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -88,7 +87,7 @@ export default function ResumesPage() {
     setBusy(true);
     try {
       await api(`/resume/duplicate/${resume._id}`, { method: 'POST', body: {} });
-      toast.success('Resume duplicated — tailor it for a new role!');
+      toast.success(t('resumesPage.toastDuplicated'));
       load();
     } catch (err) {
       toast.error(apiErrorMessage(err));
@@ -102,7 +101,7 @@ export default function ResumesPage() {
     setBusy(true);
     try {
       await api(`/resume/rename/${renaming._id}`, { method: 'PATCH', body: { title: renameValue.trim() } });
-      toast.success('Renamed');
+      toast.success(t('resumesPage.toastRenamed'));
       setRenaming(null);
       load();
     } catch (err) {
@@ -118,7 +117,7 @@ export default function ResumesPage() {
     try {
       await api(`/resume/delete/${deleting._id}`, { method: 'DELETE' });
       setResumes((prev) => prev.filter((r) => r._id !== deleting._id));
-      toast.success('Resume deleted');
+      toast.success(t('resumesPage.toastDeleted'));
       setDeleting(null);
     } catch (err) {
       toast.error(apiErrorMessage(err));
@@ -136,7 +135,7 @@ export default function ResumesPage() {
       const res = await api<{ versions: ResumeVersion[] }>(`/resume/versions/${resume._id}`);
       setVersions(res.versions || []);
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Version history is not available.'));
+      toast.error(apiErrorMessage(err, t('resumesPage.toastVersionsUnavailable')));
     } finally {
       setVersionsLoading(false);
     }
@@ -147,7 +146,7 @@ export default function ResumesPage() {
     setBusy(true);
     try {
       await api(`/resume/versions/${versionsFor._id}/restore/${version._id}`, { method: 'POST', body: {} });
-      toast.success('Version restored');
+      toast.success(t('resumesPage.toastVersionRestored'));
       setVersionsFor(null);
       setCompareVersion(null);
       load();
@@ -162,10 +161,8 @@ export default function ResumesPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Resumes</h1>
-          <p className="text-slate-500 mt-1 text-sm">
-            Duplicate a resume to tailor it per job. Every save keeps a version you can restore.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('resumesPage.title')}</h1>
+          <p className="text-slate-500 mt-1 text-sm">{t('resumesPage.subtitle')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <ImportResumeButton
@@ -174,7 +171,7 @@ export default function ResumesPage() {
             }}
           />
           <Button icon={<FilePlus2 className="w-4 h-4" />} onClick={() => router.push('/resume')}>
-            New resume
+            {t('resumesPage.newResume')}
           </Button>
         </div>
       </div>
@@ -189,8 +186,8 @@ export default function ResumesPage() {
         <Card>
           <EmptyState
             icon={<FileText className="w-6 h-6" />}
-            title="No resumes yet"
-            description="Upload the resume you already have (PDF or DOCX) or create one from scratch — the builder guides you step by step with AI suggestions."
+            title={t('resumesPage.noResumesTitle')}
+            description={t('resumesPage.noResumesDescription')}
             action={
               <div className="flex flex-col sm:flex-row gap-2 items-center justify-center">
                 <ImportResumeButton
@@ -198,7 +195,7 @@ export default function ResumesPage() {
                   onImported={(result) => router.push(`/resume/edit/${result.resume._id}`)}
                 />
                 <Button variant="outline" onClick={() => router.push('/resume')}>
-                  Start building
+                  {t('resumesPage.startBuilding')}
                 </Button>
               </div>
             }
@@ -219,7 +216,7 @@ export default function ResumesPage() {
                     <FileText className="w-5 h-5" aria-hidden />
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    <Badge tone="indigo">{resume.templateId === 'default' ? 'classic' : resume.templateId}</Badge>
+                    <Badge tone="indigo">{resume.templateId === 'default' ? t('resumesPage.templateClassic') : resume.templateId}</Badge>
                     {typeof resume.lastScore === 'number' && (
                       <Badge tone={scoreTone(resume.lastScore)}>{resume.lastScore}/100</Badge>
                     )}
@@ -227,16 +224,16 @@ export default function ResumesPage() {
                 </div>
 
                 <h3 className="text-lg font-semibold text-slate-900 truncate">
-                  {resume.title || resume.data?.fullName || 'Untitled resume'}
+                  {resume.title || resume.data?.fullName || t('resumesPage.untitledResume')}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1 mb-4">Updated {formatDate(resume.updatedAt)}</p>
+                <p className="text-xs text-slate-500 mt-1 mb-4">{t('resumesPage.updatedOn', { date: formatDate(resume.updatedAt) })}</p>
 
                 <div className="mt-auto grid grid-cols-2 gap-2">
                   <Button size="sm" variant="outline" icon={<Eye className="w-3.5 h-3.5" />} onClick={() => setPreview(resume)}>
-                    View
+                    {t('resumesPage.view')}
                   </Button>
                   <Button size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => router.push(`/resume/edit/${resume._id}`)}>
-                    Edit
+                    {t('resumesPage.edit')}
                   </Button>
                   <Button
                     size="sm"
@@ -245,10 +242,10 @@ export default function ResumesPage() {
                     disabled={busy}
                     onClick={() => handleDuplicate(resume)}
                   >
-                    Duplicate
+                    {t('resumesPage.duplicate')}
                   </Button>
                   <Button size="sm" variant="outline" icon={<History className="w-3.5 h-3.5" />} onClick={() => openVersions(resume)}>
-                    Versions
+                    {t('resumesPage.versions')}
                   </Button>
                 </div>
                 <div className="flex justify-between mt-2">
@@ -259,13 +256,13 @@ export default function ResumesPage() {
                     }}
                     className="text-xs font-medium text-slate-500 hover:text-blue-600 transition"
                   >
-                    Rename
+                    {t('resumesPage.rename')}
                   </button>
                   <button
                     onClick={() => setDeleting(resume)}
                     className="text-xs font-medium text-red-500 hover:text-red-700 transition flex items-center gap-1"
                   >
-                    <Trash2 className="w-3 h-3" aria-hidden /> Delete
+                    <Trash2 className="w-3 h-3" aria-hidden /> {t('resumesPage.delete')}
                   </button>
                 </div>
               </Card>
@@ -275,7 +272,7 @@ export default function ResumesPage() {
       )}
 
       {/* Preview modal */}
-      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title || preview?.data?.fullName || 'Resume'} size="lg">
+      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title || preview?.data?.fullName || t('resumesPage.resumeFallback')} size="lg">
         {preview && (
           <div className="overflow-auto thin-scrollbar bg-slate-100 rounded-xl p-3">
             <div className="origin-top-left scale-[0.85] sm:scale-100 w-[118%] sm:w-full">
@@ -289,7 +286,7 @@ export default function ResumesPage() {
       </Modal>
 
       {/* Rename modal */}
-      <Modal open={!!renaming} onClose={() => setRenaming(null)} title="Rename resume" size="sm">
+      <Modal open={!!renaming} onClose={() => setRenaming(null)} title={t('resumesPage.renameModalTitle')} size="sm">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -297,7 +294,7 @@ export default function ResumesPage() {
           }}
         >
           <label htmlFor="rename" className="block text-sm font-medium text-slate-700 mb-1.5">
-            Resume name
+            {t('resumesPage.resumeNameLabel')}
           </label>
           <input
             id="rename"
@@ -305,31 +302,30 @@ export default function ResumesPage() {
             onChange={(e) => setRenameValue(e.target.value)}
             autoFocus
             className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder='e.g. "Frontend roles — 2026"'
+            placeholder={t('resumesPage.renamePlaceholder')}
           />
           <div className="flex justify-end gap-2 mt-4">
             <Button type="button" variant="ghost" onClick={() => setRenaming(null)}>
-              Cancel
+              {t('resumesPage.cancel')}
             </Button>
             <Button type="submit" loading={busy} disabled={!renameValue.trim()}>
-              Save
+              {t('resumesPage.save')}
             </Button>
           </div>
         </form>
       </Modal>
 
       {/* Delete confirm */}
-      <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Delete resume?" size="sm">
+      <Modal open={!!deleting} onClose={() => setDeleting(null)} title={t('resumesPage.deleteModalTitle')} size="sm">
         <p className="text-sm text-slate-600">
-          “{deleting?.title || deleting?.data?.fullName || 'This resume'}” and its version history will be
-          permanently deleted. This cannot be undone.
+          {t('resumesPage.deleteConfirmText', { name: deleting?.title || deleting?.data?.fullName || t('resumesPage.deleteThisResumeFallback') })}
         </p>
         <div className="flex justify-end gap-2 mt-5">
           <Button variant="ghost" onClick={() => setDeleting(null)}>
-            Cancel
+            {t('resumesPage.cancel')}
           </Button>
           <Button variant="danger" loading={busy} onClick={handleDelete} icon={<Trash2 className="w-4 h-4" />}>
-            Delete
+            {t('resumesPage.delete')}
           </Button>
         </div>
       </Modal>
@@ -338,7 +334,7 @@ export default function ResumesPage() {
       <Modal
         open={!!versionsFor && !compareVersion}
         onClose={() => setVersionsFor(null)}
-        title={`Version history — ${versionsFor?.title || versionsFor?.data?.fullName || 'Resume'}`}
+        title={t('resumesPage.versionHistoryTitle', { name: versionsFor?.title || versionsFor?.data?.fullName || t('resumesPage.resumeFallback') })}
         size="md"
       >
         {versionsLoading ? (
@@ -348,9 +344,7 @@ export default function ResumesPage() {
             ))}
           </div>
         ) : versions.length === 0 ? (
-          <p className="text-sm text-slate-500 py-4 text-center">
-            No versions yet — a snapshot is stored automatically every time you save changes.
-          </p>
+          <p className="text-sm text-slate-500 py-4 text-center">{t('resumesPage.noVersionsText')}</p>
         ) : (
           <ul className="space-y-2">
             {versions.map((v, i) => (
@@ -360,16 +354,16 @@ export default function ResumesPage() {
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-900">
-                    {v.label || `Version ${versions.length - i}`}
+                    {v.label || t('resumesPage.versionLabel', { n: versions.length - i })}
                   </p>
                   <p className="text-xs text-slate-500">{formatDateTime(v.createdAt)}</p>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   <Button size="sm" variant="outline" icon={<Columns2 className="w-3.5 h-3.5" />} onClick={() => setCompareVersion(v)}>
-                    Compare
+                    {t('resumesPage.compare')}
                   </Button>
                   <Button size="sm" variant="outline" icon={<RotateCcw className="w-3.5 h-3.5" />} disabled={busy} onClick={() => restoreVersion(v)}>
-                    Restore
+                    {t('resumesPage.restore')}
                   </Button>
                 </div>
               </li>
@@ -382,14 +376,14 @@ export default function ResumesPage() {
       <Modal
         open={!!compareVersion}
         onClose={() => setCompareVersion(null)}
-        title={`Compare — current vs ${formatDateTime(compareVersion?.createdAt)}`}
+        title={t('resumesPage.compareTitle', { date: formatDateTime(compareVersion?.createdAt) })}
         size="full"
       >
         {compareVersion && versionsFor && (
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Badge tone="green">Current</Badge>
+                <Badge tone="green">{t('resumesPage.current')}</Badge>
               </div>
               <div className="border border-slate-200 rounded-xl overflow-auto max-h-[65vh] thin-scrollbar bg-white">
                 <div className="origin-top-left scale-[0.7] w-[143%]">
@@ -402,9 +396,9 @@ export default function ResumesPage() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Badge tone="amber">{compareVersion.label || `Saved ${formatDateTime(compareVersion.createdAt)}`}</Badge>
+                <Badge tone="amber">{compareVersion.label || t('resumesPage.savedAt', { date: formatDateTime(compareVersion.createdAt) })}</Badge>
                 <Button size="sm" variant="outline" icon={<RotateCcw className="w-3.5 h-3.5" />} disabled={busy} onClick={() => restoreVersion(compareVersion)}>
-                  Restore this version
+                  {t('resumesPage.restoreThisVersion')}
                 </Button>
               </div>
               <div className="border border-slate-200 rounded-xl overflow-auto max-h-[65vh] thin-scrollbar bg-white">

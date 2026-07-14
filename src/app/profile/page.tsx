@@ -33,12 +33,14 @@ import TagInput from '@/components/ui/TagInput';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
 import type { CareerProfile, VaultItem, ResumeRecord } from '@/lib/types';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 type Tab = 'twin' | 'vault' | 'goals' | 'passport';
 
 function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
   const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'twin');
   const [profile, setProfile] = useState<CareerProfile | null>(null);
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
@@ -51,9 +53,10 @@ function ProfileContent() {
       api<ResumeRecord[]>('/resume/resumes'),
     ]);
     if (profRes.status === 'fulfilled') setProfile(profRes.value);
-    else toast.error(apiErrorMessage(profRes.reason, 'Could not load your career profile.'));
+    else toast.error(apiErrorMessage(profRes.reason, t('profilePage.toastLoadError')));
     if (resumesRes.status === 'fulfilled') setResumes(resumesRes.value);
     setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -70,7 +73,7 @@ function ProfileContent() {
     try {
       const res = await api<{ profile: CareerProfile; added: number }>(`/profile/import-from-resume/${resumeId}`, { method: 'POST' });
       setProfile(res.profile);
-      toast.success(`Imported ${res.added} new item(s) into your Career Digital Twin.`);
+      toast.success(t('profilePage.toastImported', { n: res.added }));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -112,26 +115,23 @@ function ProfileContent() {
   if (!profile) return null;
 
   const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'twin', label: 'Digital Twin', icon: UserCircle2 },
-    { id: 'vault', label: `Career Vault (${profile.vault.length})`, icon: Sparkles },
-    { id: 'goals', label: 'Goals & Roadmap', icon: Target },
-    { id: 'passport', label: 'Career Passport', icon: Share2 },
+    { id: 'twin', label: t('profilePage.tabTwin'), icon: UserCircle2 },
+    { id: 'vault', label: t('profilePage.tabVault', { n: profile.vault.length }), icon: Sparkles },
+    { id: 'goals', label: t('profilePage.tabGoals'), icon: Target },
+    { id: 'passport', label: t('profilePage.tabPassport'), icon: Share2 },
   ];
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Career Profile</h1>
-          <p className="text-slate-500 mt-1 text-sm sm:text-base max-w-2xl">
-            Your verified Career Digital Twin — everything here feeds smarter matching, roadmaps, and resumes,
-            without re-typing it each time.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('profilePage.careerProfile')}</h1>
+          <p className="text-slate-500 mt-1 text-sm sm:text-base max-w-2xl">{t('profilePage.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-end">
             <p className="text-2xl font-bold text-blue-600">{profile.completionPct}%</p>
-            <p className="text-xs text-slate-500">profile complete</p>
+            <p className="text-xs text-slate-500">{t('profilePage.profileComplete')}</p>
           </div>
         </div>
       </div>
@@ -190,6 +190,7 @@ function TwinTab({
   onAddSkill: (name: string) => void;
   onRemoveSkill: (name: string) => void;
 }) {
+  const { t } = useLocale();
   const [skillDraft, setSkillDraft] = useState('');
 
   return (
@@ -197,14 +198,12 @@ function TwinTab({
       <div className="lg:col-span-2 space-y-6">
         {resumes.length > 0 && (
           <Card>
-            <h2 className="font-semibold text-slate-900 mb-3">Import from an existing resume</h2>
-            <p className="text-sm text-slate-500 mb-3">
-              Pulls experience, education, and skills into your Digital Twin — never overwrites, only adds what&apos;s new.
-            </p>
+            <h2 className="font-semibold text-slate-900 mb-3">{t('profilePage.importFromResumeTitle')}</h2>
+            <p className="text-sm text-slate-500 mb-3">{t('profilePage.importFromResumeDesc')}</p>
             <div className="flex flex-wrap gap-2">
               {resumes.map((r) => (
                 <Button key={r._id} size="sm" variant="outline" loading={busy} onClick={() => onImport(r._id)}>
-                  {r.title || r.data?.fullName || 'Untitled resume'}
+                  {r.title || r.data?.fullName || t('profilePage.untitledResume')}
                 </Button>
               ))}
             </div>
@@ -213,16 +212,16 @@ function TwinTab({
 
         <Card>
           <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-500" aria-hidden /> Experience ({profile.experience.length})
+            <FileText className="w-4 h-4 text-blue-500" aria-hidden /> {t('profilePage.experienceTitle', { n: profile.experience.length })}
           </h2>
           {profile.experience.length === 0 ? (
-            <p className="text-sm text-slate-500">No experience yet — import from a resume above.</p>
+            <p className="text-sm text-slate-500">{t('profilePage.noExperienceText')}</p>
           ) : (
             <ul className="space-y-3">
               {profile.experience.map((e, i) => (
                 <li key={i} className="border border-slate-100 rounded-xl p-3">
                   <p className="text-sm font-medium text-slate-900">
-                    {e.role || 'Role'} · {e.company || 'Company'}
+                    {e.role || t('profilePage.roleFallback')} · {e.company || t('profilePage.companyFallback')}
                   </p>
                   <p className="text-xs text-slate-400">{e.from} – {e.to}</p>
                 </li>
@@ -233,10 +232,10 @@ function TwinTab({
 
         <Card>
           <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Award className="w-4 h-4 text-violet-500" aria-hidden /> Education ({profile.education.length})
+            <Award className="w-4 h-4 text-violet-500" aria-hidden /> {t('profilePage.educationTitle', { n: profile.education.length })}
           </h2>
           {profile.education.length === 0 ? (
-            <p className="text-sm text-slate-500">No education yet — import from a resume above.</p>
+            <p className="text-sm text-slate-500">{t('profilePage.noEducationText')}</p>
           ) : (
             <ul className="space-y-2">
               {profile.education.map((e, i) => (
@@ -251,7 +250,7 @@ function TwinTab({
 
       <div className="space-y-6">
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-3">Skills with evidence</h2>
+          <h2 className="font-semibold text-slate-900 mb-3">{t('profilePage.skillsWithEvidenceTitle')}</h2>
           <div className="flex flex-wrap gap-1.5 mb-3">
             {profile.skills.map((s) => (
               <span
@@ -260,9 +259,11 @@ function TwinTab({
                 title={s.evidence || undefined}
               >
                 {s.name}
-                {s.source !== 'user' && <span className="text-blue-400">·{s.source === 'resume-import' ? 'imported' : 'AI'}</span>}
+                {s.source !== 'user' && (
+                  <span className="text-blue-400">·{s.source === 'resume-import' ? t('profilePage.skillSourceImported') : t('profilePage.skillSourceAI')}</span>
+                )}
                 <button
-                  aria-label={`Remove ${s.name}`}
+                  aria-label={t('profilePage.removeSkillAria', { name: s.name })}
                   onClick={() => onRemoveSkill(s.name)}
                   className="p-0.5 rounded-full hover:bg-blue-100 transition"
                 >
@@ -270,7 +271,7 @@ function TwinTab({
                 </button>
               </span>
             ))}
-            {profile.skills.length === 0 && <p className="text-sm text-slate-500">No skills yet.</p>}
+            {profile.skills.length === 0 && <p className="text-sm text-slate-500">{t('profilePage.noSkillsText')}</p>}
           </div>
           <div className="flex gap-2">
             <input
@@ -283,7 +284,7 @@ function TwinTab({
                   setSkillDraft('');
                 }
               }}
-              placeholder="Add a skill…"
+              placeholder={t('profilePage.addSkillPlaceholder')}
               className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <Button
@@ -294,24 +295,24 @@ function TwinTab({
                 setSkillDraft('');
               }}
             >
-              Add
+              {t('profilePage.add')}
             </Button>
           </div>
         </Card>
 
         <Card>
           <h2 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-            <FolderGit2 className="w-4 h-4 text-emerald-500" aria-hidden /> Projects
+            <FolderGit2 className="w-4 h-4 text-emerald-500" aria-hidden /> {t('profilePage.projectsTitle')}
           </h2>
-          <p className="text-sm text-slate-500">{profile.projects.length} saved. Manage detailed projects from the Career Vault tab.</p>
+          <p className="text-sm text-slate-500">{t('profilePage.projectsSavedText', { n: profile.projects.length })}</p>
         </Card>
 
         <Card>
           <h2 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-            <LanguagesIcon className="w-4 h-4 text-amber-500" aria-hidden /> Languages
+            <LanguagesIcon className="w-4 h-4 text-amber-500" aria-hidden /> {t('profilePage.languagesTitle')}
           </h2>
           <p className="text-sm text-slate-500">
-            {profile.languages.length > 0 ? profile.languages.map((l) => l.name).join(', ') : 'None added yet.'}
+            {profile.languages.length > 0 ? profile.languages.map((l) => l.name).join(', ') : t('profilePage.noLanguagesText')}
           </p>
         </Card>
       </div>
@@ -324,6 +325,7 @@ function TwinTab({
 // ---------------------------------------------------------------------------
 
 function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p: CareerProfile) => void }) {
+  const { t } = useLocale();
   const [adding, setAdding] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [draftMetric, setDraftMetric] = useState('');
@@ -347,7 +349,7 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
       setDraftText('');
       setDraftMetric('');
       setAdding(false);
-      toast.success('Added to your Career Vault.');
+      toast.success(t('profilePage.toastAddedToVault'));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -374,7 +376,7 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
       });
       setQuestions(res.questions);
       setAnswers(new Array(res.questions.length).fill(''));
-      if (!res.aiUsed) toast.info('AI not configured — showing standard clarifying questions.');
+      if (!res.aiUsed) toast.info(t('profilePage.toastAiNotConfiguredQuestions'));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -391,7 +393,7 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
         body: { type: 'achievement', text: combined, source: 'ai-confirmed', tags: ['achievement-interview'] },
       });
       onChange(updated);
-      toast.success('Saved to your Career Vault with the metrics you confirmed.');
+      toast.success(t('profilePage.toastSavedWithMetrics'));
       setInterviewOpen(false);
       setInterviewBullet('');
       setQuestions([]);
@@ -408,23 +410,20 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
       <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
-            <MessageSquareQuote className="w-4 h-4 text-purple-500" aria-hidden /> AI Achievement Interview
+            <MessageSquareQuote className="w-4 h-4 text-purple-500" aria-hidden /> {t('profilePage.achievementInterviewTitle')}
           </h2>
-          <p className="text-sm text-slate-500 max-w-xl">
-            Paste a vague bullet — AI asks clarifying questions to help you recall the real metric. It never invents
-            numbers; you supply them.
-          </p>
+          <p className="text-sm text-slate-500 max-w-xl">{t('profilePage.achievementInterviewDesc')}</p>
         </div>
         <Button icon={<Wand2 className="w-4 h-4" />} onClick={() => setInterviewOpen(true)}>
-          Start interview
+          {t('profilePage.startInterview')}
         </Button>
       </Card>
 
       <Card>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-900">Saved achievements & bullets ({profile.vault.length})</h2>
+          <h2 className="font-semibold text-slate-900">{t('profilePage.savedAchievementsTitle', { n: profile.vault.length })}</h2>
           <Button size="sm" variant="outline" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setAdding(true)}>
-            Add manually
+            {t('profilePage.addManually')}
           </Button>
         </div>
 
@@ -434,18 +433,18 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
               value={draftText}
               onChange={(e) => setDraftText(e.target.value)}
               rows={2}
-              placeholder="e.g. Reduced deployment time by 60% by automating the release pipeline"
+              placeholder={t('profilePage.draftTextPlaceholder')}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <input
               value={draftMetric}
               onChange={(e) => setDraftMetric(e.target.value)}
-              placeholder="Metric (optional), e.g. 60% faster deploys"
+              placeholder={t('profilePage.draftMetricPlaceholder')}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex gap-2">
-              <Button size="sm" loading={saving} onClick={addVaultItem}>Save</Button>
-              <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button size="sm" loading={saving} onClick={addVaultItem}>{t('profilePage.save')}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>{t('profilePage.cancel')}</Button>
             </div>
           </div>
         )}
@@ -453,8 +452,8 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
         {profile.vault.length === 0 ? (
           <EmptyState
             icon={<Sparkles className="w-6 h-6" />}
-            title="Your Career Vault is empty"
-            description="Save reusable, evidence-backed bullets and achievements here — pull them into any resume later."
+            title={t('profilePage.vaultEmptyTitle')}
+            description={t('profilePage.vaultEmptyDesc')}
           />
         ) : (
           <ul className="space-y-3">
@@ -465,7 +464,7 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
                   {v.metric && <Badge tone="green" className="mt-1.5">{v.metric}</Badge>}
                 </div>
                 <button
-                  aria-label="Remove"
+                  aria-label={t('profilePage.removeAria')}
                   onClick={() => removeVaultItem(v._id)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition shrink-0"
                 >
@@ -477,19 +476,19 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
         )}
       </Card>
 
-      <Modal open={interviewOpen} onClose={() => setInterviewOpen(false)} title="AI Achievement Interview" size="lg">
+      <Modal open={interviewOpen} onClose={() => setInterviewOpen(false)} title={t('profilePage.interviewModalTitle')} size="lg">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Your bullet (as-is, even if vague)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.yourBulletLabel')}</label>
             <textarea
               value={interviewBullet}
               onChange={(e) => setInterviewBullet(e.target.value)}
               rows={2}
-              placeholder="e.g. Helped improve the checkout flow"
+              placeholder={t('profilePage.interviewBulletPlaceholder')}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <Button size="sm" className="mt-2" loading={interviewLoading} onClick={startInterview}>
-              Ask clarifying questions
+              {t('profilePage.askClarifyingQuestions')}
             </Button>
           </div>
 
@@ -501,13 +500,13 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
                   <input
                     value={answers[i] || ''}
                     onChange={(e) => setAnswers((prev) => prev.map((a, idx) => (idx === i ? e.target.value : a)))}
-                    placeholder="Your answer — only real numbers you know"
+                    placeholder={t('profilePage.answerPlaceholder')}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               ))}
               <Button loading={saving} onClick={saveInterviewResult} fullWidth>
-                Save to Career Vault
+                {t('profilePage.saveToVault')}
               </Button>
             </div>
           )}
@@ -522,6 +521,7 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
 // ---------------------------------------------------------------------------
 
 function GoalsTab({ profile, onChange }: { profile: CareerProfile; onChange: (p: CareerProfile) => void }) {
+  const { t } = useLocale();
   const [careerGoals, setCareerGoals] = useState(profile.careerGoals);
   const [targetRoles, setTargetRoles] = useState(profile.targetRoles);
   const [saving, setSaving] = useState(false);
@@ -532,7 +532,7 @@ function GoalsTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
     try {
       const updated = await api<CareerProfile>('/profile/goals', { method: 'PUT', body: { careerGoals, targetRoles } });
       onChange(updated);
-      toast.success('Career goals saved.');
+      toast.success(t('profilePage.toastGoalsSaved'));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -548,7 +548,7 @@ function GoalsTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
         body: { targetRole: targetRoles[0] || '' },
       });
       onChange({ ...profile, roadmap: res.roadmap });
-      toast.success(res.aiUsed ? 'Your Career GPS roadmap is ready.' : 'Roadmap generated (AI not configured — using a standard plan).');
+      toast.success(res.aiUsed ? t('profilePage.toastRoadmapReady') : t('profilePage.toastRoadmapStandard'));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -574,48 +574,45 @@ function GoalsTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
   return (
     <div className="grid lg:grid-cols-2 gap-6 items-start">
       <Card className="space-y-4">
-        <h2 className="font-semibold text-slate-900">Career goals</h2>
+        <h2 className="font-semibold text-slate-900">{t('profilePage.careerGoalsTitle')}</h2>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">What are you working toward?</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.workingTowardLabel')}</label>
           <textarea
             value={careerGoals}
             onChange={(e) => setCareerGoals(e.target.value)}
             rows={3}
-            placeholder="e.g. Become a staff engineer within 3 years, leading a platform team."
+            placeholder={t('profilePage.careerGoalsPlaceholder')}
             className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <TagInput
           id="target-roles"
-          label="Target roles"
+          label={t('profilePage.targetRolesLabel')}
           values={targetRoles}
           onChange={setTargetRoles}
-          placeholder="e.g. Senior Frontend Engineer — press Enter"
+          placeholder={t('profilePage.targetRolesPlaceholder')}
         />
-        <Button size="sm" loading={saving} onClick={saveGoals}>Save goals</Button>
+        <Button size="sm" loading={saving} onClick={saveGoals}>{t('profilePage.saveGoals')}</Button>
       </Card>
 
       <Card>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Target className="w-4 h-4 text-blue-500" aria-hidden /> Career GPS
+            <Target className="w-4 h-4 text-blue-500" aria-hidden /> {t('profilePage.careerGpsTitle')}
           </h2>
           <Button size="sm" variant="outline" loading={generating} onClick={generateRoadmap}>
-            {hasRoadmap ? 'Regenerate' : 'Generate roadmap'}
+            {hasRoadmap ? t('profilePage.regenerate') : t('profilePage.generateRoadmap')}
           </Button>
         </div>
         {!hasRoadmap ? (
-          <p className="text-sm text-slate-500">
-            Generate a personalized 30-day, 90-day, and long-term roadmap grounded in your profile and real skill gaps
-            from live job matches.
-          </p>
+          <p className="text-sm text-slate-500">{t('profilePage.roadmapEmptyText')}</p>
         ) : (
           <div className="space-y-5">
             {(
               [
-                ['30 days', 'thirtyDay'],
-                ['90 days', 'ninetyDay'],
-                ['Long term', 'longTerm'],
+                [t('profilePage.thirtyDays'), 'thirtyDay'],
+                [t('profilePage.ninetyDays'), 'ninetyDay'],
+                [t('profilePage.longTerm'), 'longTerm'],
               ] as const
             ).map(([label, key]) => (
               <div key={key}>
@@ -659,6 +656,7 @@ function PassportTab({
   resumes: ResumeRecord[];
   onChange: (p: CareerProfile) => void;
 }) {
+  const { t } = useLocale();
   const [headline, setHeadline] = useState(profile.passport.headline);
   const [resumeId, setResumeId] = useState(profile.passport.resumeId || '');
   const [showProjects, setShowProjects] = useState(profile.passport.showProjects);
@@ -693,7 +691,7 @@ function PassportTab({
         },
       });
       onChange(updated);
-      toast.success(enabled ? 'Career Passport is live.' : 'Career Passport is now private.');
+      toast.success(enabled ? t('profilePage.toastPassportPublic') : t('profilePage.toastPassportPrivate'));
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
@@ -703,14 +701,14 @@ function PassportTab({
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(publicUrl);
-    toast.success('Link copied');
+    toast.success(t('profilePage.toastLinkCopied'));
   };
 
   return (
     <div className="grid lg:grid-cols-2 gap-6 items-start">
       <Card className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">Public Career Passport</h2>
+          <h2 className="font-semibold text-slate-900">{t('profilePage.publicPassportTitle')}</h2>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -718,35 +716,32 @@ function PassportTab({
               onChange={(e) => save(e.target.checked)}
               className="w-5 h-5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
             />
-            <span className="text-sm text-slate-600">{profile.passport.enabled ? 'Public' : 'Private'}</span>
+            <span className="text-sm text-slate-600">{profile.passport.enabled ? t('profilePage.public') : t('profilePage.private')}</span>
           </label>
         </div>
-        <p className="text-sm text-slate-500">
-          A shareable page with your experience, projects, and certifications — no email or phone exposed. Perfect for
-          a LinkedIn bio link or a QR code on your resume.
-        </p>
+        <p className="text-sm text-slate-500">{t('profilePage.passportDesc')}</p>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Headline</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.headlineLabel')}</label>
           <input
             value={headline}
             onChange={(e) => setHeadline(e.target.value)}
-            placeholder="e.g. Senior Frontend Engineer"
+            placeholder={t('profilePage.headlinePlaceholder')}
             className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         {resumes.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Link a downloadable resume (optional)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.linkResumeLabel')}</label>
             <select
               value={resumeId}
               onChange={(e) => setResumeId(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">None</option>
+              <option value="">{t('profilePage.none')}</option>
               {resumes.map((r) => (
-                <option key={r._id} value={r._id}>{r.title || r.data?.fullName || 'Untitled'}</option>
+                <option key={r._id} value={r._id}>{r.title || r.data?.fullName || t('profilePage.untitled')}</option>
               ))}
             </select>
           </div>
@@ -755,37 +750,37 @@ function PassportTab({
         <div className="flex gap-4">
           <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="w-4 h-4 rounded text-blue-600 border-slate-300" />
-            Show projects
+            {t('profilePage.showProjects')}
           </label>
           <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input type="checkbox" checked={showCertifications} onChange={(e) => setShowCertifications(e.target.checked)} className="w-4 h-4 rounded text-blue-600 border-slate-300" />
-            Show certifications
+            {t('profilePage.showCertifications')}
           </label>
         </div>
 
         <Button size="sm" loading={saving} onClick={() => save(profile.passport.enabled)}>
-          Save settings
+          {t('profilePage.saveSettings')}
         </Button>
       </Card>
 
       <Card className="flex flex-col items-center text-center gap-4">
         {profile.passport.enabled && publicUrl ? (
           <>
-            {qrDataUrl && <img src={qrDataUrl} alt="QR code linking to your Career Passport" className="rounded-xl border border-slate-200" />}
+            {qrDataUrl && <img src={qrDataUrl} alt={t('profilePage.qrAlt')} className="rounded-xl border border-slate-200" />}
             <p className="text-sm text-slate-600 break-all">{publicUrl}</p>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" icon={<Copy className="w-3.5 h-3.5" />} onClick={copyLink}>Copy link</Button>
+              <Button size="sm" variant="outline" icon={<Copy className="w-3.5 h-3.5" />} onClick={copyLink}>{t('profilePage.copyLink')}</Button>
               <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="outline" icon={<Eye className="w-3.5 h-3.5" />}>Preview</Button>
+                <Button size="sm" variant="outline" icon={<Eye className="w-3.5 h-3.5" />}>{t('profilePage.preview')}</Button>
               </a>
             </div>
-            <p className="text-xs text-slate-400">{profile.passport.viewCount} view(s) so far</p>
+            <p className="text-xs text-slate-400">{t('profilePage.viewsSoFar', { n: profile.passport.viewCount })}</p>
           </>
         ) : (
           <EmptyState
             icon={<Share2 className="w-6 h-6" />}
-            title="Passport is private"
-            description="Turn it on to get a shareable link and QR code."
+            title={t('profilePage.passportPrivateTitle')}
+            description={t('profilePage.passportPrivateDesc')}
           />
         )}
       </Card>

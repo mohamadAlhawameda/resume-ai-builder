@@ -5,6 +5,7 @@ import { Reorder, useDragControls } from "framer-motion";
 import { GraduationCap, XCircle } from "lucide-react";
 import FloatingInput from "../ui/FloatingInput";
 import FloatingTextarea from "../ui/FloatingTextarea"; // Assuming you have this component
+import { useLocale } from "@/i18n/LocaleProvider";
 
 // Updated type with optional achievements
 type EducationEntry = {
@@ -28,6 +29,7 @@ export default function EducationStep({
   addItem,
   removeItem,
 }: EducationStepProps) {
+  const { t } = useLocale();
   const dragControls = useDragControls();
 
   const handleReorder = (newOrder: EducationEntry[]) => {
@@ -45,21 +47,19 @@ export default function EducationStep({
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <GraduationCap className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-semibold text-gray-800">Education</h2>
+          <h2 className="text-xl font-semibold text-gray-800">{t('builderPage.stepEducation')}</h2>
         </div>
         <button
           type="button"
           onClick={addItem}
           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition"
         >
-          + Add Education
+          {t('builderPage.addEducation')}
         </button>
       </div>
 
       {education.length === 0 && (
-        <p className="text-sm text-gray-500 text-center italic py-6">
-          No education entries yet. Start by adding one above.
-        </p>
+        <p className="text-sm text-gray-500 text-center italic py-6">{t('builderPage.noEducationYet')}</p>
       )}
 
       <Reorder.Group axis="y" values={education} onReorder={handleReorder} className="space-y-6">
@@ -75,19 +75,19 @@ export default function EducationStep({
               className="text-xs text-gray-400 font-mono absolute top-0.5 left-3 cursor-move"
               onPointerDown={(e) => dragControls.start(e)}
             >
-              ⠿ Drag
+              {t('builderPage.dragHandle')}
             </div>
 
             <FloatingInput
               id={`school-${index}`}
-              label="School Name"
+              label={t('builderPage.schoolNameLabel')}
               value={item.school}
               onChange={(e) => onChange(index, "school", e.target.value)}
             />
 
             <FloatingInput
               id={`degree-${index}`}
-              label="Degree / Program"
+              label={t('builderPage.degreeProgramLabel')}
               value={item.degree}
               onChange={(e) => onChange(index, "degree", e.target.value)}
             />
@@ -95,14 +95,14 @@ export default function EducationStep({
             <div className="grid grid-cols-2 gap-4">
               <FloatingInput
                 id={`from-${index}`}
-                label="Start Year"
+                label={t('builderPage.startYearLabel')}
                 value={item.from}
                 onChange={(e) => onChange(index, "from", e.target.value)}
               />
 
               <FloatingInput
                 id={`to-${index}`}
-                label="End Year"
+                label={t('builderPage.endYearLabel')}
                 value={item.to}
                 onChange={(e) => onChange(index, "to", e.target.value)}
               />
@@ -111,7 +111,7 @@ export default function EducationStep({
             {/* New optional achievements field */}
             <FloatingTextarea
               id={`achievements-${index}`}
-              label="Achievements (optional)"
+              label={t('builderPage.achievementsOptionalLabel')}
               value={item.achievements || ""}
               onChange={(e) => onChange(index, "achievements", e.target.value)}
             />
@@ -121,7 +121,7 @@ export default function EducationStep({
               onClick={() => removeItem(index)}
               className="flex items-center gap-1 text-red-600 text-sm hover:underline hover:text-red-700 mt-1"
             >
-              <XCircle className="w-4 h-4" /> Remove
+              <XCircle className="w-4 h-4" /> {t('builderPage.removeButton')}
             </button>
           </Reorder.Item>
         ))}

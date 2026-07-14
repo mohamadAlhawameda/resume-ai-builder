@@ -9,6 +9,7 @@ import {
 } from "@hello-pangea/dnd";
 import FloatingInput from "../ui/FloatingInput";
 import FloatingTextarea from "../ui/FloatingTextarea";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 interface ExperienceEntry {
   company: string;
@@ -43,6 +44,7 @@ export default function ExperienceStep({
   aiExpSuggestions = [],
   aiLoading = false,
 }: ExperienceStepProps) {
+  const { t } = useLocale();
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
 
@@ -65,7 +67,7 @@ export default function ExperienceStep({
         onClick={addItem}
         className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
       >
-        + Add Experience
+        {t('builderPage.addExperience')}
       </button>
 
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -91,14 +93,14 @@ export default function ExperienceStep({
                       <div
                         {...provided.dragHandleProps}
                         className="cursor-move text-gray-400 text-sm mb-2 select-none"
-                        aria-label="Drag handle"
+                        aria-label={t('builderPage.dragHandleAria')}
                       >
-                        ⠿ Drag
+                        {t('builderPage.dragHandle')}
                       </div>
 
                       <FloatingInput
                         id={`company-${index}`}
-                        label="Company"
+                        label={t('builderPage.companyLabel')}
                         value={exp.company}
                         onChange={(e) =>
                           onChange(index, "company", e.target.value)
@@ -107,7 +109,7 @@ export default function ExperienceStep({
 
                       <FloatingInput
                         id={`role-${index}`}
-                        label="Role"
+                        label={t('builderPage.roleLabel')}
                         value={exp.role}
                         onChange={(e) => onChange(index, "role", e.target.value)}
                       />
@@ -115,13 +117,13 @@ export default function ExperienceStep({
                       <div className="flex gap-4">
                         <FloatingInput
                           id={`from-${index}`}
-                          label="From"
+                          label={t('builderPage.fromLabel')}
                           value={exp.from}
                           onChange={(e) => onChange(index, "from", e.target.value)}
                         />
                         <FloatingInput
                           id={`to-${index}`}
-                          label="To"
+                          label={t('builderPage.toLabel')}
                           value={exp.to}
                           onChange={(e) => onChange(index, "to", e.target.value)}
                         />
@@ -129,7 +131,7 @@ export default function ExperienceStep({
 
                       <FloatingTextarea
                         id={`description-${index}`}
-                        label="Description"
+                        label={t('builderPage.descriptionLabel')}
                         value={exp.description}
                         onChange={(e) =>
                           onChange(index, "description", e.target.value)
@@ -147,7 +149,7 @@ export default function ExperienceStep({
                               : "text-purple-600 hover:underline"
                           }`}
                         >
-                          {aiLoading ? "Generating..." : "AI Suggestion"}
+                          {aiLoading ? t('builderPage.generatingEllipsis') : t('builderPage.aiSuggestionLink')}
                         </button>
 
                         <button
@@ -155,7 +157,7 @@ export default function ExperienceStep({
                           onClick={() => removeItem(index)}
                           className="text-red-600 hover:underline text-sm"
                         >
-                          Remove
+                          {t('builderPage.removeButton')}
                         </button>
                       </div>
 

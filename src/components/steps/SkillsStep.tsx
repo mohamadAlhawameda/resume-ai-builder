@@ -4,6 +4,7 @@ import React from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import FloatingInput from '../ui/FloatingInput';
 import { Sparkles } from 'lucide-react';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 interface SkillsStepProps {
   skills: string[];
@@ -24,6 +25,7 @@ export default function SkillsStep({
   aiSkillSuggestions = [],
   aiLoading = false,
 }: SkillsStepProps) {
+  const { t } = useLocale();
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const reordered = Array.from(skills);
@@ -60,7 +62,7 @@ export default function SkillsStep({
                     >
                       <button
                         type="button"
-                        title="Remove Skill"
+                        title={t('builderPage.removeSkillTitle')}
                         onClick={(e) => {
                           e.stopPropagation();
                           removeItem(index);
@@ -72,7 +74,7 @@ export default function SkillsStep({
 
                       <FloatingInput
                         id={`skill-${index}`}
-                        label={`Skill #${index + 1}`}
+                        label={t('builderPage.skillNumberLabel', { n: index + 1 })}
                         value={skill}
                         onChange={(e) => onChange(index, e.target.value)}
                       />
@@ -91,7 +93,7 @@ export default function SkillsStep({
           onClick={addItem}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
         >
-          + Add Skill
+          {t('builderPage.addSkillButton')}
         </button>
 
         {getSkillSuggestions && (
@@ -105,7 +107,7 @@ export default function SkillsStep({
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            {aiLoading ? 'Generating...' : 'Suggest Skills'}
+            {aiLoading ? t('builderPage.generatingEllipsis') : t('builderPage.suggestSkillsButton')}
           </button>
         )}
       </div>

@@ -4,16 +4,30 @@ const JobPreferencesSchema = new mongoose.Schema(
   {
     titles: { type: [String], default: [] },
     skills: { type: [String], default: [] },
+    // Legacy freeform location tags — kept for backward compatibility and as
+    // a fallback for locations outside the structured country/region lists.
     locations: { type: [String], default: [] },
+    // Structured location preferences — multi-select.
+    countries: { type: [String], default: [] }, // ISO codes, e.g. ['US','CA']
+    caProvinces: { type: [String], default: [] }, // full names, e.g. ['Ontario']
+    usStates: { type: [String], default: [] }, // full names, e.g. ['California']
+    cities: { type: [String], default: [] }, // freeform city/area names
     workType: {
       type: String,
       enum: ['any', 'full-time', 'part-time', 'contract', 'internship'],
       default: 'any',
     },
+    // Legacy single-select — derived from remoteTypes for old clients.
     remote: {
       type: String,
       enum: ['any', 'remote', 'hybrid', 'onsite'],
       default: 'any',
+    },
+    // Multi-select work-style preference. Empty = open to any.
+    remoteTypes: {
+      type: [String],
+      enum: ['remote', 'hybrid', 'onsite'],
+      default: [],
     },
     salaryMin: { type: Number, default: null },
     salaryMax: { type: Number, default: null },

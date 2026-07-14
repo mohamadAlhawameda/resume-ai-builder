@@ -25,6 +25,7 @@ import SkillsStep from './steps/SkillsStep';
 import ResumePreview from './ResumePreview';
 import SectionManager from './SectionManager';
 import Button from './ui/Button';
+import Modal from './ui/Modal';
 import { api, ApiError, apiErrorMessage } from '@/lib/api';
 import { getToken, isLoggedIn } from '@/lib/auth';
 import { exportElementToPDF, exportToDocx } from '@/lib/exportResume';
@@ -36,13 +37,20 @@ import {
   type TemplateId,
   type TemplateCustomization,
 } from '@/lib/types';
+import { useLocale } from '@/i18n/LocaleProvider';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-const STEPS = ['Contact', 'Experience', 'Education', 'Skills', 'Customize'];
-
 export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const router = useRouter();
+  const { t } = useLocale();
+  const STEPS = [
+    t('builderPage.stepContact'),
+    t('builderPage.stepExperience'),
+    t('builderPage.stepEducation'),
+    t('builderPage.stepSkills'),
+    t('builderPage.stepCustomize'),
+  ];
   const { id } = useParams();
   const routeResumeId = Array.isArray(id) ? id[0] : id;
 
@@ -63,6 +71,11 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
   const [aiSummarySuggestions, setAiSummarySuggestions] = useState<string[]>([]);
   const [aiExpSuggestions, setAiExpSuggestions] = useState<string[][]>([]);
   const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
+
+  // Every resume needs a clear, distinct name before it can be saved.
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // ---------- Load: local draft (create) or server resume (edit) ----------
 
@@ -91,7 +104,8 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
           if (res.templateId && res.templateId !== 'default') setTemplate(res.templateId as TemplateId);
         }
       })
-      .catch((err) => toast.error(apiErrorMessage(err, 'Failed to load resume.')));
+      .catch((err) => toast.error(apiErrorMessage(err, t('builderPage.toastLoadFailed'))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, routeResumeId, router]);
 
   // ---------- Persistence ----------
@@ -104,6 +118,8 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
   const saveToServer = useCallback(
     async (silent = false): Promise<boolean> => {
       if (!isLoggedIn()) return false;
+      const title = formData.title?.trim();
+      if (!title) return false; // caller (handleSaveResume) gates this via the naming modal
       setSaveState('saving');
       try {
         const res = await api<{ _id: string }>('/resume/create', {
@@ -112,19 +128,28 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             ...(resumeId ? { id: resumeId } : {}),
             data: formData,
             templateId: template,
-            title: formData.title || formData.fullName || 'Untitled resume',
+            title,
           },
         });
         if (!resumeId && res?._id) setResumeId(res._id);
         setSaveState('saved');
-        if (!silent) toast.success('Resume saved');
+        if (!silent) toast.success(t('builderPage.toastResumeSaved'));
         return true;
       } catch (err) {
         setSaveState('error');
-        if (!silent) toast.error(apiErrorMessage(err, 'Failed to save resume.'));
+        // Duplicate name — surface it in the naming modal so the user can
+        // fix it inline instead of a dead-end toast.
+        if (err instanceof ApiError && err.status === 409) {
+          setNameDraft(title);
+          setNameError(err.message);
+          setNameModalOpen(true);
+          return false;
+        }
+        if (!silent) toast.error(apiErrorMessage(err, t('builderPage.toastSaveFailed')));
         return false;
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [formData, template, resumeId]
   );
 
@@ -257,22 +282,22 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
     try {
       const res = await generate('summary');
       setAiSummarySuggestions(res.suggestions || []);
-      if (!res.suggestions?.length) toast.info('No suggestions returned — try adding more detail first.');
+      if (!res.suggestions?.length) toast.info(t('builderPage.toastNoSuggestions'));
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Could not get AI suggestions.'));
+      toast.error(apiErrorMessage(err, t('builderPage.toastAiSuggestError')));
     } finally {
       setAiLoading(false);
     }
-  }, [formData.summary, generate]);
+  }, [formData.summary, generate, t]);
 
   const getExperienceSuggestions = async (index: number) => {
     const exp = formData.experience[index];
     if (!exp?.description.trim()) {
-      toast.info('Fill in the job description first, then let AI improve it.');
+      toast.info(t('builderPage.toastFillJobDescFirst'));
       return;
     }
     if (!isLoggedIn()) {
-      toast.info('Log in to use AI experience suggestions.');
+      toast.info(t('builderPage.toastLoginForExpSuggestions'));
       return;
     }
     setAiLoading(true);
@@ -284,7 +309,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
         return updated;
       });
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'AI could not improve this description.'));
+      toast.error(apiErrorMessage(err, t('builderPage.toastAiExpFailed')));
     } finally {
       setAiLoading(false);
     }
@@ -292,7 +317,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
 
   const getSkillSuggestions = async () => {
     if (!isLoggedIn()) {
-      toast.info('Log in to use AI skill suggestions.');
+      toast.info(t('builderPage.toastLoginForSkillSuggestions'));
       return;
     }
     setAiLoading(true);
@@ -306,7 +331,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
         .filter((s) => !formData.skills.some((have) => have.toLowerCase() === s.toLowerCase()));
       setAiSkillSuggestions(cleaned);
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'AI could not suggest skills.'));
+      toast.error(apiErrorMessage(err, t('builderPage.toastAiSkillsFailed')));
     } finally {
       setAiLoading(false);
     }
@@ -320,20 +345,59 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
       router.push('/login?redirect=saveResume');
       return;
     }
+    if (!formData.title?.trim()) {
+      setNameDraft(formData.fullName ? `${formData.fullName} Resume` : '');
+      setNameError(null);
+      setNameModalOpen(true);
+      return;
+    }
     setSaving(true);
     const ok = await saveToServer();
     setSaving(false);
     if (ok && mode === 'create' && !resumeId) router.push('/dashboard');
   };
 
+  const confirmNameAndSave = async () => {
+    const title = nameDraft.trim();
+    if (!title) {
+      setNameError(t('builderPage.nameRequiredError'));
+      return;
+    }
+    setFormData((old) => ({ ...old, title }));
+    setNameModalOpen(false);
+    setNameError(null);
+    setSaving(true);
+    // formData.title updates asynchronously via setState, so pass the
+    // confirmed title straight through rather than reading stale state.
+    try {
+      const res = await api<{ _id: string }>('/resume/create', {
+        method: 'POST',
+        body: { ...(resumeId ? { id: resumeId } : {}), data: { ...formData, title }, templateId: template, title },
+      });
+      if (!resumeId && res?._id) setResumeId(res._id);
+      setSaveState('saved');
+      toast.success(t('builderPage.toastResumeSaved'));
+      if (mode === 'create' && !resumeId) router.push('/dashboard');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setNameError(err.message);
+        setNameModalOpen(true);
+      } else {
+        toast.error(apiErrorMessage(err, t('builderPage.toastSaveFailed')));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleExportPDF = async () => {
     setExporting('pdf');
     try {
       await exportElementToPDF(exportRef.current, `${formData.fullName || 'resume'}.pdf`);
-      toast.success('PDF downloaded');
+      toast.success(t('builderPage.toastPdfDownloaded'));
     } catch (err) {
       console.error(err);
-      toast.error('PDF export failed — please try again.');
+      toast.error(t('builderPage.toastPdfFailed'));
     } finally {
       setExporting(null);
     }
@@ -343,10 +407,10 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
     setExporting('docx');
     try {
       await exportToDocx(formData, `${formData.fullName || 'resume'}.docx`);
-      toast.success('DOCX downloaded');
+      toast.success(t('builderPage.toastDocxDownloaded'));
     } catch (err) {
       console.error(err);
-      toast.error('DOCX export failed — please try again.');
+      toast.error(t('builderPage.toastDocxFailed'));
     } finally {
       setExporting(null);
     }
@@ -369,14 +433,14 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
   const saveIndicator =
     saveState === 'saving' ? (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…
+        <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('builderPage.savingIndicator')}
       </span>
     ) : saveState === 'saved' ? (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-        <Check className="w-3.5 h-3.5" /> All changes saved
+        <Check className="w-3.5 h-3.5" /> {t('builderPage.savedIndicator')}
       </span>
     ) : saveState === 'error' ? (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500">Autosave failed</span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500">{t('builderPage.autosaveFailed')}</span>
     ) : null;
 
   return (
@@ -385,10 +449,10 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-            {mode === 'edit' ? 'Edit Your Resume' : 'Create Your Resume'}
+            {mode === 'edit' ? t('builderPage.editTitle') : t('builderPage.createTitle')}
           </h1>
           <div className="flex items-center gap-3 mt-1 min-h-[18px]">
-            <p className="text-sm text-slate-500">Your work is saved automatically to this browser.</p>
+            <p className="text-sm text-slate-500">{t('builderPage.autosaveNotice')}</p>
             {saveIndicator}
           </div>
         </div>
@@ -400,7 +464,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             onClick={() => setShowPreview((v) => !v)}
             className="xl:hidden"
           >
-            {showPreview ? 'Hide preview' : 'Preview'}
+            {showPreview ? t('builderPage.hidePreview') : t('builderPage.previewButton')}
           </Button>
           <Button
             variant="outline"
@@ -409,7 +473,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             loading={exporting === 'pdf'}
             onClick={handleExportPDF}
           >
-            PDF
+            {t('builderPage.pdfButton')}
           </Button>
           <Button
             variant="outline"
@@ -418,7 +482,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             loading={exporting === 'docx'}
             onClick={handleExportDocx}
           >
-            DOCX
+            {t('builderPage.docxButton')}
           </Button>
           <Button
             size="sm"
@@ -426,7 +490,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             loading={saving}
             onClick={handleSaveResume}
           >
-            {isLoggedIn() ? 'Save' : 'Save (log in)'}
+            {isLoggedIn() ? t('builderPage.saveButton') : t('builderPage.saveLoginButton')}
           </Button>
         </div>
       </div>
@@ -519,42 +583,42 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
                   <section className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-8">
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2 mb-1">
-                        <Settings2 className="w-5 h-5 text-blue-500" aria-hidden /> Customize & finish
+                        <Settings2 className="w-5 h-5 text-blue-500" aria-hidden /> {t('builderPage.customizeFinishTitle')}
                       </h2>
-                      <p className="text-sm text-slate-500">
-                        Name your resume, pick a template, arrange sections, and tune the look.
-                      </p>
+                      <p className="text-sm text-slate-500">{t('builderPage.customizeFinishDesc')}</p>
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <label htmlFor="resumeTitle" className="block text-sm font-medium text-slate-700 mb-1.5">
-                          Resume name
+                          {t('builderPage.resumeNameLabel')} <span className="text-red-500">*</span>
                         </label>
                         <input
                           id="resumeTitle"
+                          required
                           value={formData.title || ''}
                           onChange={(e) => setFormData((old) => ({ ...old, title: e.target.value }))}
-                          placeholder='e.g. "Frontend roles — 2026"'
+                          placeholder={t('builderPage.resumeNamePlaceholder')}
                           className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                        <p className="mt-1 text-xs text-slate-500">{t('builderPage.resumeNameHelper')}</p>
                       </div>
                       <div>
                         <label htmlFor="builderTargetRole" className="block text-sm font-medium text-slate-700 mb-1.5">
-                          Target role <span className="text-slate-400 font-normal">(shown on some templates)</span>
+                          {t('builderPage.targetRoleLabel')} <span className="text-slate-400 font-normal">{t('builderPage.targetRoleOptional')}</span>
                         </label>
                         <input
                           id="builderTargetRole"
                           value={formData.targetRole || ''}
                           onChange={(e) => setFormData((old) => ({ ...old, targetRole: e.target.value }))}
-                          placeholder="e.g. Frontend Developer"
+                          placeholder={t('builderPage.targetRolePlaceholder')}
                           className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-900 mb-2.5">Template</h3>
+                      <h3 className="text-sm font-semibold text-slate-900 mb-2.5">{t('builderPage.templateLabel')}</h3>
                       <TemplateSelector template={template} setTemplate={(v) => setTemplate(v as TemplateId)} />
                     </div>
 
@@ -569,13 +633,13 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-slate-100">
                       <Button icon={<FileDown className="w-4 h-4" />} loading={exporting === 'pdf'} onClick={handleExportPDF} variant="secondary">
-                        Export PDF
+                        {t('builderPage.exportPdfButton')}
                       </Button>
                       <Button icon={<FileText className="w-4 h-4" />} loading={exporting === 'docx'} onClick={handleExportDocx} variant="outline">
-                        Export DOCX
+                        {t('builderPage.exportDocxButton')}
                       </Button>
                       <Button icon={<CloudUpload className="w-4 h-4" />} loading={saving} onClick={handleSaveResume} variant="success">
-                        {isLoggedIn() ? 'Save to my account' : 'Log in & save'}
+                        {isLoggedIn() ? t('builderPage.saveToAccountButton') : t('builderPage.loginSaveButton')}
                       </Button>
                     </div>
                   </section>
@@ -587,10 +651,10 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
           {/* Step navigation buttons */}
           <div className="flex justify-between items-center gap-4 mt-8">
             <Button variant="outline" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
-              Previous
+              {t('builderPage.previousButton')}
             </Button>
             {step < STEPS.length - 1 && (
-              <Button onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Next</Button>
+              <Button onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>{t('builderPage.nextButton')}</Button>
             )}
           </div>
         </div>
@@ -598,7 +662,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
         {/* ---------- Live preview column ---------- */}
         <div className={`${showPreview ? 'block' : 'hidden'} xl:block`}>
           <div className="xl:sticky xl:top-20">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Live preview</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">{t('builderPage.livePreviewLabel')}</p>
             <div className="bg-slate-200/60 rounded-2xl p-3 sm:p-5 overflow-auto thin-scrollbar max-h-[80vh] border border-slate-200">
               <div className="origin-top-left scale-[0.45] sm:scale-[0.6] lg:scale-[0.7] w-[222%] sm:w-[166%] lg:w-[142%]">
                 <div className="shadow-2xl">
@@ -616,6 +680,41 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
           <ResumePreview data={formData} template={template} />
         </div>
       </div>
+
+      {/* Every resume needs a clear, distinct name before it can be saved. */}
+      <Modal open={nameModalOpen} onClose={() => setNameModalOpen(false)} title={t('builderPage.nameModalTitle')} size="sm">
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">{t('builderPage.nameModalDesc')}</p>
+          <div>
+            <label htmlFor="resumeNameModal" className="sr-only">
+              {t('builderPage.resumeNameSrLabel')}
+            </label>
+            <input
+              id="resumeNameModal"
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => {
+                setNameDraft(e.target.value);
+                setNameError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirmNameAndSave();
+                }
+              }}
+              placeholder={t('builderPage.resumeNamePlaceholder')}
+              className={`w-full px-3.5 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 ${
+                nameError ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
+              }`}
+            />
+            {nameError && <p className="text-red-600 text-xs mt-1.5 font-medium">{nameError}</p>}
+          </div>
+          <Button fullWidth loading={saving} onClick={confirmNameAndSave}>
+            {t('builderPage.saveResumeButton')}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
