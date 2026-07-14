@@ -30,13 +30,13 @@ export default function LanguageSwitcher({ className }: { className?: string }) 
         aria-label="Change language"
         className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
       >
-        <Globe className="w-4 h-4" aria-hidden />
-        <span className="hidden sm:inline">{t(`language.${locale}`)}</span>
+        <Globe className="w-4 h-4 shrink-0" aria-hidden />
+        <span>{t(`language.${locale}`)}</span>
       </button>
       {open && (
         <div
           role="menu"
-          className="absolute end-0 mt-2 w-40 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50"
+          className="absolute end-0 mt-2 w-40 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50"
         >
           {LOCALES.map((l: Locale) => (
             <button
