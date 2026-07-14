@@ -33,11 +33,9 @@ const FloatingInput: React.FC<Props> = ({
         aria-describedby={helperText ? `${id}-helper-text` : undefined}
         aria-invalid={error}
         className={clsx(
-          'peer h-12 w-full border rounded-md px-3 pt-5 pb-2 text-sm placeholder-transparent focus:outline-none',
-          error
-            ? 'border-red-500 focus:ring-2 focus:ring-red-400'
-            : 'border-gray-300 focus:ring-2 focus:ring-blue-500',
-          rest.disabled && 'bg-gray-100 text-gray-500 cursor-not-allowed'
+          'peer h-12 w-full border rounded-md px-3 pt-5 pb-2 text-sm bg-surface text-foreground placeholder-transparent focus:outline-none',
+          error ? 'border-danger focus:ring-2 focus:ring-danger/40' : 'border-border-strong focus:ring-2 focus:ring-primary',
+          rest.disabled && 'bg-muted text-muted-foreground cursor-not-allowed'
         )}
         placeholder={label}
       />
@@ -45,22 +43,16 @@ const FloatingInput: React.FC<Props> = ({
       <label
         htmlFor={id}
         className={clsx(
-          'absolute left-3 text-xs text-gray-500 transition-all',
-          'peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400',
-          'peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-600'
+          'absolute start-3 top-2 text-xs text-muted-foreground transition-all',
+          'peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-muted-foreground',
+          'peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary'
         )}
       >
         {label}
       </label>
 
       {helperText && (
-        <p
-          id={`${id}-helper-text`}
-          className={clsx(
-            'mt-1 text-xs',
-            error ? 'text-red-500' : 'text-gray-500'
-          )}
-        >
+        <p id={`${id}-helper-text`} className={clsx('mt-1 text-xs', error ? 'text-danger' : 'text-muted-foreground')}>
           {helperText}
         </p>
       )}

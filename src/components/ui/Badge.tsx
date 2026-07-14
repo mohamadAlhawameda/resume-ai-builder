@@ -4,13 +4,13 @@ import clsx from 'clsx';
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'slate' | 'purple' | 'indigo';
 
 const tones: Record<Tone, string> = {
-  blue: 'bg-blue-50 text-blue-700 border-blue-200',
-  green: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200',
-  red: 'bg-red-50 text-red-700 border-red-200',
-  slate: 'bg-slate-100 text-slate-600 border-slate-200',
-  purple: 'bg-purple-50 text-purple-700 border-purple-200',
-  indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  blue: 'bg-primary/10 text-primary border-primary/20',
+  green: 'bg-success/10 text-success border-success/20',
+  amber: 'bg-warning/10 text-warning border-warning/20',
+  red: 'bg-danger/10 text-danger border-danger/20',
+  slate: 'bg-muted text-muted-foreground border-border',
+  purple: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/25',
+  indigo: 'bg-accent/10 text-accent border-accent/20',
 };
 
 export default function Badge({

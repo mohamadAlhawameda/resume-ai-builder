@@ -1,13 +1,126 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens — semantic, theme-aware CSS variables. Light values live on
+   :root, dark overrides live on .dark. Everything below references these
+   (never raw hex) so light/dark stay in sync from one place.
+
+   NOTE: the resume PDF/print templates (src/components/resumeTemplates/*)
+   intentionally do NOT use these tokens — they stay inline hex/rgb because
+   html2canvas (used for PDF export) cannot parse oklch()/var() output. Do not
+   "fix" that file to use tokens; it would break resume export.
+--------------------------------------------------------------------------- */
 :root {
+  color-scheme: light;
+
   --background: #f8fafc;
   --foreground: #0f172a;
+
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-hover: #f1f5f9;
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-foreground: #ffffff;
+
+  --accent: #4f46e5;
+  --accent-foreground: #ffffff;
+
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-foreground: #ffffff;
+
+  --success: #16a34a;
+  --success-hover: #15803d;
+  --success-foreground: #ffffff;
+
+  --warning: #d97706;
+  --warning-hover: #b45309;
+  --warning-foreground: #ffffff;
+
+  --ring: #2563eb;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #020617;
+  --foreground: #f1f5f9;
+
+  --surface: #0f172a;
+  --surface-raised: #1e293b;
+  --surface-hover: #1e293b;
+
+  --border: #1e293b;
+  --border-strong: #334155;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-foreground: #ffffff;
+
+  --accent: #6366f1;
+  --accent-foreground: #ffffff;
+
+  --danger: #ef4444;
+  --danger-hover: #f87171;
+  --danger-foreground: #ffffff;
+
+  --success: #22c55e;
+  --success-hover: #4ade80;
+  --success-foreground: #052e14;
+
+  --warning: #f59e0b;
+  --warning-hover: #fbbf24;
+  --warning-foreground: #451a03;
+
+  --ring: #60a5fa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-foreground: var(--danger-foreground);
+
+  --color-success: var(--success);
+  --color-success-hover: var(--success-hover);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-hover: var(--warning-hover);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-ring: var(--ring);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -17,6 +130,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Arabic locale: swap the whole app to a font with proper Arabic shaping. */
@@ -34,7 +148,12 @@ html[dir='rtl'] .rtl-flip {
 /* Legacy input classes kept for backward compatibility */
 .input-field,
 .input {
-  @apply w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200;
+  @apply w-full px-4 py-2 border border-border rounded-lg shadow-sm bg-surface text-foreground transition duration-200;
+}
+.input-field:focus,
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
 }
 
 /* Consistent, visible keyboard-focus everywhere */
@@ -42,8 +161,9 @@ a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid #2563eb;
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -59,8 +179,8 @@ textarea:focus-visible {
   top: 0;
   z-index: 999;
   padding: 0.75rem 1.25rem;
-  background: #1e293b;
-  color: #fff;
+  background: var(--foreground);
+  color: var(--background);
   border-end-end-radius: 0.5rem;
   font-weight: 600;
 }
@@ -70,7 +190,7 @@ textarea:focus-visible {
 
 /* Reusable gradient text treatment for marketing headlines */
 .gradient-text {
-  background: linear-gradient(90deg, #2563eb, #4f46e5);
+  background: linear-gradient(90deg, var(--primary), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -78,8 +198,21 @@ textarea:focus-visible {
 
 /* Faint dot-grid texture for hero/marketing section backgrounds */
 .bg-dot-grid {
-  background-image: radial-gradient(circle, rgba(37, 99, 235, 0.14) 1px, transparent 1px);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--primary) 16%, transparent) 1px, transparent 1px);
   background-size: 22px 22px;
+}
+
+/* Soft, slightly colored elevation — the app's "premium" card shadow.
+   Two steps (contact + ambient) read as softer than a single flat shadow. */
+.shadow-soft {
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent),
+    0 12px 28px -12px color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+.shadow-soft-lg {
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--foreground) 6%, transparent),
+    0 24px 48px -16px color-mix(in srgb, var(--foreground) 22%, transparent);
 }
 
 /* Subtle entrance animation utility */
@@ -97,17 +230,30 @@ textarea:focus-visible {
   animation: fade-up 0.45s ease-out both;
 }
 
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
 /* Slim scrollbars for panels */
 .thin-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 .thin-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 .thin-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--border-strong);
   border-radius: 3px;
 }
 

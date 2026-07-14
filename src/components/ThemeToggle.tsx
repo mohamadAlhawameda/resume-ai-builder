@@ -1,35 +1,44 @@
-"use client";
+'use client';
 
-import React, { useEffect } from "react";
-import { Sun, Moon } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { Sun, Moon } from 'lucide-react';
+import clsx from 'clsx';
+import { useLocale } from '@/i18n/LocaleProvider';
+import { applyTheme, getCurrentTheme, type Theme } from '@/lib/theme';
 
-// Define the props interface
-interface ThemeToggleProps {
-  theme: "light" | "dark";
-  setTheme: (theme: "light" | "dark") => void;
-}
+export default function ThemeToggle({ className }: { className?: string }) {
+  const { t } = useLocale();
+  // null until mount: the blocking script in layout.tsx already set the real
+  // class before paint, so we just need to read it once on the client rather
+  // than guess (and risk a hydration flash) on the server.
+  const [theme, setTheme] = useState<Theme | null>(null);
 
-export default function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
   useEffect(() => {
-    document.documentElement.classList.remove("light", "dark");
-    document.documentElement.classList.add(theme);
-  }, [theme]);
+    setTheme(getCurrentTheme());
+  }, []);
+
+  const toggle = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    setTheme(next);
+  };
+
+  if (theme === null) {
+    return <span className={clsx('inline-block min-w-11 min-h-11', className)} aria-hidden />;
+  }
 
   return (
     <button
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-      className="flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded text-sm shadow hover:shadow-md transition"
-      title="Toggle Theme"
-    >
-      {theme === "light" ? (
-        <>
-          <Moon className="w-4 h-4 mr-2 text-gray-800" /> Dark
-        </>
-      ) : (
-        <>
-          <Sun className="w-4 h-4 mr-2 text-yellow-300" /> Light
-        </>
+      type="button"
+      onClick={toggle}
+      aria-label={theme === 'dark' ? t('common.switchToLightMode') : t('common.switchToDarkMode')}
+      title={theme === 'dark' ? t('common.switchToLightMode') : t('common.switchToDarkMode')}
+      className={clsx(
+        'inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover transition',
+        className
       )}
+    >
+      {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" aria-hidden /> : <Moon className="w-[18px] h-[18px]" aria-hidden />}
     </button>
   );
 }

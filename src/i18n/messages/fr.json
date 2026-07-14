@@ -16,7 +16,9 @@
     "markAllRead": "Tout marquer comme lu",
     "viewJobMatches": "Voir les correspondances",
     "tools": "Outils",
-    "newResume": "Nouveau CV"
+    "newResume": "Nouveau CV",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu"
   },
   "footer": {
     "tagline": "Créez des CV remarquables, évaluez-les selon les critères ATS et découvrez des emplois qui correspondent réellement à votre expérience — propulsé par l'IA.",
@@ -65,7 +67,16 @@
     "feature6Text": "Enregistrez des emplois, suivez postulé → entretien → offre, et recevez des alertes lors d'une forte correspondance.",
     "ctaTitle": "Votre prochain poste n'est qu'à un meilleur CV",
     "ctaSubtitle": "Commencez gratuitement. Créez, analysez et comparez en une seule session — la plupart des utilisateurs terminent leur premier CV en moins de 15 minutes.",
-    "ctaButton": "Créer mon CV"
+    "ctaButton": "Créer mon CV",
+    "mockBadge": "Analyse par IA",
+    "mockScanTitle": "Analyse du CV",
+    "mockScoreDelta": "+12 depuis la dernière analyse",
+    "mockAts": "Compatibilité ATS",
+    "mockImpact": "Impact",
+    "mockKeywords": "Mots-clés",
+    "mockTopMatch": "Meilleure correspondance",
+    "mockJobTitle": "Développeur Frontend",
+    "mockCompany": "Northwind Labs · Hybride"
   },
   "auth": {
     "loginTitle": "Content de vous revoir",
@@ -102,7 +113,8 @@
   "language": {
     "en": "English",
     "ar": "العربية",
-    "fr": "Français"
+    "fr": "Français",
+    "changeLanguage": "Changer de langue"
   },
   "common": {
     "scoreExcellent": "Excellent",
@@ -111,7 +123,24 @@
     "scoreNeedsWork": "À améliorer",
     "scoreWeak": "Faible",
     "scoreDefaultLabel": "Score",
-    "ariaScoreLabel": "{label} : {score} sur 100"
+    "ariaScoreLabel": "{label} : {score} sur 100",
+    "switchToLightMode": "Passer au mode clair",
+    "switchToDarkMode": "Passer au mode sombre",
+    "loading": "Chargement…",
+    "retry": "Réessayer",
+    "somethingWentWrong": "Une erreur est survenue",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "close": "Fermer",
+    "back": "Retour",
+    "or": "ou",
+    "importPdfDocx": "Importer un PDF / DOCX",
+    "readingResume": "Lecture de votre CV…",
+    "importFileTypeError": "Veuillez choisir un fichier PDF ou DOCX.",
+    "importFileSizeError": "Ce fichier dépasse la limite de 5 Mo.",
+    "importSuccess": "CV importé — vérifiez les informations détectées.",
+    "importFailed": "Échec de l'importation — veuillez réessayer.",
+    "googleSignInFailed": "Échec de la connexion Google — veuillez réessayer."
   },
   "jobsPage": {
     "title": "Découverte d'emplois",
@@ -224,6 +253,17 @@
     "scanResume": "Analyser le CV",
     "newResume": "Nouveau CV",
     "go": "Aller",
+    "nextAction": {
+      "buildDigitalTwin": "Créez votre jumeau numérique de carrière — ajoutez votre expérience et vos compétences pour que chaque recommandation future soit fondée sur des preuves réelles.",
+      "createFirstResume": "Créez votre premier CV — importez-en un existant ou créez-en un de toutes pièces en quelques minutes.",
+      "runFirstScan": "Lancez votre première analyse de CV pour obtenir un score sur 100 et un plan d'amélioration.",
+      "improveScore": "Votre dernier score est de {score}/100 — appliquez les corrections principales pour dépasser 70.",
+      "checkRadar": "Consultez le Radar d'opportunités pour les emplois auxquels vous êtes admissible dès maintenant.",
+      "achievementInterview": "Faites l'entretien de réalisations par IA pour saisir de vraies mesures dans votre coffre-fort de carrière.",
+      "generateRoadmap": "Générez votre feuille de route de carrière — un plan personnalisé de 30/90 jours vers votre poste cible.",
+      "setTargetRoles": "Définissez vos postes cibles pour affiner la correspondance et les recommandations.",
+      "greatShape": "Tout va bien — consultez le Radar d'opportunités pour les nouvelles correspondances du jour."
+    },
     "statResumes": "CV",
     "statLatestScore": "Dernier score",
     "statSavedJobs": "Offres enregistrées",
@@ -268,7 +308,23 @@
     "allJobs": "Toutes les offres",
     "jobMatchesEmpty": "Les correspondances d'emplois apparaissent une fois qu'un CV est enregistré.",
     "toastLoadResumesError": "Impossible de charger vos CV.",
-    "toastTargetUpdated": "Objectif de carrière mis à jour"
+    "toastTargetUpdated": "Objectif de carrière mis à jour",
+    "yourWeek": "Votre semaine en un coup d'œil",
+    "weekScans": "Analyses cette semaine",
+    "weekApplications": "Candidatures cette semaine",
+    "weekSaved": "Emplois enregistrés cette semaine",
+    "careerProgress": "Progression de carrière",
+    "progressComplete": "Votre jumeau numérique de carrière est complet — les recommandations sont aussi précises que possible.",
+    "progressIncomplete": "Complétez davantage votre jumeau numérique de carrière pour affiner les recommandations.",
+    "completeProfile": "Compléter le profil",
+    "missingSkills": "Compétences à ajouter",
+    "seeSkillImpact": "Voir l'impact des compétences",
+    "recentAchievements": "Réalisations récentes",
+    "noAchievements": "Votre coffre-fort de carrière est encore vide — l'entretien de réalisations par IA peut vous aider à enregistrer la première.",
+    "openVault": "Ouvrir le coffre-fort de carrière",
+    "upcomingTasks": "Tâches à venir",
+    "comingSoon": "Bientôt disponible",
+    "upcomingTasksDescription": "Les rappels de suivi et d'entretien apparaîtront ici dès le lancement de la fonctionnalité Réseau — suivez vos échanges avec les recruteurs et ne manquez plus aucune relance."
   },
   "resumesPage": {
     "title": "Mes CV",
@@ -698,5 +754,17 @@
     "spacingCompact": "Compact",
     "spacingNormal": "Normal",
     "spacingRelaxed": "Aéré"
+  },
+  "passportPage": {
+    "notFoundTitle": "Passeport carrière introuvable",
+    "notFoundDescription": "Ce lien est peut-être désactivé ou n'existe plus.",
+    "notAvailable": "Ce passeport carrière n'est pas disponible.",
+    "viewResume": "Voir le CV",
+    "openInAppToast": "Ouvrez le profil de cette personne dans l'application pour exporter son CV associé.",
+    "skills": "Compétences",
+    "experience": "Expérience",
+    "education": "Formation",
+    "projects": "Projets",
+    "certifications": "Certifications"
   }
 }

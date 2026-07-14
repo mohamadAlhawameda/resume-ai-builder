@@ -27,8 +27,8 @@ const FloatingTextarea: React.FC<Props> = ({
         onChange={onChange}
         {...rest}
         className={clsx(
-          "peer w-full border border-gray-300 rounded-md px-3 pt-5 pb-2 text-sm placeholder-transparent focus:outline-none focus:ring-2 focus:ring-blue-500",
-          rest.disabled && "bg-gray-100 text-gray-500",
+          "peer w-full border border-border-strong rounded-md px-3 pt-5 pb-2 text-sm bg-surface text-foreground placeholder-transparent focus:outline-none focus:ring-2 focus:ring-primary",
+          rest.disabled && "bg-muted text-muted-foreground",
           className
         )}
         placeholder={label}
@@ -36,7 +36,7 @@ const FloatingTextarea: React.FC<Props> = ({
       />
       <label
         htmlFor={id}
-        className="absolute left-3 top-2 text-gray-500 text-xs transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-400 peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-600"
+        className="absolute start-3 top-2 text-muted-foreground text-xs transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-muted-foreground peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary"
       >
         {label}
       </label>

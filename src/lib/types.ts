@@ -410,7 +410,8 @@ export interface CareerProfile {
 }
 
 export interface NextAction {
-  action: string;
+  key: string;
+  params: Record<string, string | number>;
   href: string;
 }
 

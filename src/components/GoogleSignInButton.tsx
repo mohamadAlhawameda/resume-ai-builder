@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useLocale } from '@/i18n/LocaleProvider';
 import type { StoredUser } from '@/lib/auth';
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
@@ -40,9 +41,16 @@ interface Props {
 }
 
 export default function GoogleSignInButton({ onSuccess }: Props) {
+  const { t } = useLocale();
   const divRef = useRef<HTMLDivElement>(null);
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
+  // The GIS callback is registered once inside a mount-only effect (see the
+  // `[]` deps below), so it closes over whatever `t` was at mount time. Mirror
+  // the onSuccessRef treatment above so a mid-session language switch doesn't
+  // leave the error toast stuck showing the old locale's text.
+  const tRef = useRef(t);
+  tRef.current = t;
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -63,7 +71,7 @@ export default function GoogleSignInButton({ onSuccess }: Props) {
             if (!result?.token || !result?.user) throw new Error('Invalid response');
             onSuccessRef.current(result);
           } catch (err) {
-            toast.error(apiErrorMessage(err, 'Google sign-in failed — please try again.'));
+            toast.error(apiErrorMessage(err, tRef.current('common.googleSignInFailed')));
           }
         },
       });
@@ -98,9 +106,9 @@ export default function GoogleSignInButton({ onSuccess }: Props) {
   return (
     <div className="mt-6">
       <div className="flex items-center gap-3 mb-4" aria-hidden>
-        <div className="flex-1 h-px bg-slate-200" />
-        <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">or</span>
-        <div className="flex-1 h-px bg-slate-200" />
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{t('common.or')}</span>
+        <div className="flex-1 h-px bg-border" />
       </div>
       <div ref={divRef} className="flex justify-center min-h-[44px]" />
     </div>

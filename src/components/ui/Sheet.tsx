@@ -6,23 +6,20 @@ import { X } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface ModalProps {
+interface SheetProps {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  className?: string;
 }
 
-const sizes = {
-  sm: 'max-w-md',
-  md: 'max-w-xl',
-  lg: 'max-w-3xl',
-  xl: 'max-w-5xl',
-  full: 'max-w-[95vw]',
-};
-
-export default function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+/** Mobile bottom-sheet drawer: slides up from the bottom below sm, becomes a
+ * centered panel (like Modal) at sm+. Structurally mirrors Modal.tsx but with
+ * a different entrance direction and a drag-handle affordance, for content
+ * that reads more like "a panel that lives at the bottom of the screen"
+ * (filters, quick actions, add/edit forms) than a true dialog. */
+export default function Sheet({ open, onClose, title, children, className }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,7 +46,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
           onClick={onClose}
         >
           <motion.div
@@ -58,27 +55,31 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
             aria-modal="true"
             aria-label={title}
             tabIndex={-1}
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
             className={clsx(
-              'bg-surface text-foreground w-full rounded-2xl shadow-soft-lg flex flex-col max-h-[90vh] focus:outline-none',
-              sizes[size]
+              'bg-surface text-foreground w-full sm:max-w-lg flex flex-col max-h-[85vh] focus:outline-none shadow-soft-lg',
+              'rounded-t-2xl sm:rounded-2xl',
+              className
             )}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-              <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+              <span className="w-10 h-1 rounded-full bg-border-strong" aria-hidden />
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
+              <h2 className="text-base font-semibold text-foreground">{title}</h2>
               <button
                 onClick={onClose}
-                aria-label="Close dialog"
+                aria-label="Close"
                 className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="px-6 py-5 overflow-y-auto">{children}</div>
+            <div className="px-5 py-4 overflow-y-auto thin-scrollbar">{children}</div>
           </motion.div>
         </motion.div>
       )}

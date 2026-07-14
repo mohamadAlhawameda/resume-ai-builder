@@ -300,6 +300,7 @@ export default function ResumesPage() {
             id="rename"
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate: this field only exists inside a just-opened Modal, so moving focus into it matches the WAI-ARIA dialog pattern.
             autoFocus
             className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder={t('resumesPage.renamePlaceholder')}

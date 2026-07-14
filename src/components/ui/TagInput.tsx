@@ -27,21 +27,21 @@ export default function TagInput({ id, label, values, onChange, placeholder, hel
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">
+      <label htmlFor={id} className="block text-sm font-medium text-foreground mb-1.5">
         {label}
       </label>
-      <div className="flex flex-wrap gap-1.5 items-center w-full min-h-[46px] px-3 py-2 border border-slate-300 rounded-xl bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition">
+      <div className="flex flex-wrap gap-1.5 items-center w-full min-h-[46px] px-3 py-2 border border-border-strong rounded-xl bg-surface focus-within:ring-2 focus-within:ring-primary focus-within:border-primary transition">
         {values.map((v) => (
           <span
             key={v}
-            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full pl-2.5 pr-1 py-0.5 text-xs font-medium"
+            className="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 rounded-full ps-2.5 pe-1 py-0.5 text-xs font-medium"
           >
             {v}
             <button
               type="button"
               aria-label={`Remove ${v}`}
               onClick={() => onChange(values.filter((x) => x !== v))}
-              className="p-0.5 rounded-full hover:bg-blue-100 transition"
+              className="p-0.5 rounded-full hover:bg-primary/20 transition"
             >
               <X className="w-3 h-3" />
             </button>
@@ -61,10 +61,10 @@ export default function TagInput({ id, label, values, onChange, placeholder, hel
           }}
           onBlur={commit}
           placeholder={values.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-[120px] bg-transparent text-sm text-slate-900 focus:outline-none py-1"
+          className="flex-1 min-w-[120px] bg-transparent text-sm text-foreground focus:outline-none py-1"
         />
       </div>
-      {helper && <p className="mt-1 text-xs text-slate-500">{helper}</p>}
+      {helper && <p className="mt-1 text-xs text-muted-foreground">{helper}</p>}
     </div>
   );
 }

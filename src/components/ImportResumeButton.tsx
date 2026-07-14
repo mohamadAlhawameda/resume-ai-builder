@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import { Upload } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { apiUpload, apiErrorMessage } from '@/lib/api';
+import { useLocale } from '@/i18n/LocaleProvider';
 import type { ImportResumeResult } from '@/lib/types';
 
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -26,28 +27,29 @@ export default function ImportResumeButton({
   variant = 'outline',
   size = 'md',
   fullWidth = false,
-  label = 'Import PDF / DOCX',
+  label,
 }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
     if (!/\.(pdf|docx)$/i.test(file.name)) {
-      toast.error('Please choose a PDF or DOCX file.');
+      toast.error(t('common.importFileTypeError'));
       return;
     }
     if (file.size > MAX_SIZE) {
-      toast.error('That file is over the 5 MB limit.');
+      toast.error(t('common.importFileSizeError'));
       return;
     }
     setUploading(true);
     try {
       const result = await apiUpload<ImportResumeResult>('/resume/import', file);
-      toast.success('Resume imported — review the details we detected.');
+      toast.success(t('common.importSuccess'));
       onImported(result);
     } catch (err) {
-      toast.error(apiErrorMessage(err, 'Import failed — please try again.'));
+      toast.error(apiErrorMessage(err, t('common.importFailed')));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -73,7 +75,7 @@ export default function ImportResumeButton({
         icon={<Upload className="w-4 h-4" />}
         onClick={() => inputRef.current?.click()}
       >
-        {uploading ? 'Reading your resume…' : label}
+        {uploading ? t('common.readingResume') : label || t('common.importPdfDocx')}
       </Button>
     </>
   );

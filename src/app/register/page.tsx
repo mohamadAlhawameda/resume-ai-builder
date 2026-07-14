@@ -121,33 +121,33 @@ function RegisterContent() {
   };
 
   const inputClass = (hasError: boolean) =>
-    `w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition ${
-      hasError ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
+    `w-full px-4 py-3 min-h-11 rounded-xl border text-sm bg-surface text-foreground focus:outline-none focus:ring-2 transition ${
+      hasError ? 'border-danger focus:ring-danger' : 'border-border-strong focus:ring-primary'
     }`;
 
   const strengthColor =
     passwordStrength === t('auth.strengthStrong')
-      ? 'text-emerald-600'
+      ? 'text-success'
       : passwordStrength === t('auth.strengthMedium')
-      ? 'text-amber-600'
-      : 'text-red-600';
+      ? 'text-warning'
+      : 'text-danger';
 
   return (
-    <main className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-white to-emerald-50 px-4 py-12">
+    <main className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center overflow-hidden bg-gradient-to-br from-primary/5 via-background to-success/5 px-4 py-12">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute -top-24 -end-24 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-24 -start-24 w-96 h-96 bg-emerald-400/15 rounded-full blur-3xl" />
+        <div className="absolute -top-24 -end-24 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -start-24 w-96 h-96 bg-success/15 rounded-full blur-3xl" />
       </div>
       <motion.form
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         onSubmit={handleSubmit(onSubmit)}
-        className="relative w-full max-w-lg bg-white/95 backdrop-blur-sm p-8 sm:p-10 rounded-3xl shadow-[0_30px_80px_-20px_rgba(37,99,235,0.25)] ring-1 ring-slate-900/5 border border-slate-100"
+        className="relative w-full max-w-lg bg-surface/95 backdrop-blur-sm p-6 sm:p-10 rounded-3xl shadow-[0_30px_80px_-20px_rgba(37,99,235,0.25)] dark:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)] ring-1 ring-foreground/5 border border-border"
         noValidate
       >
-        <h1 className="text-2xl sm:text-3xl font-bold text-center text-slate-900 mb-2">{t('auth.registerTitle')}</h1>
-        <p className="text-sm text-slate-500 text-center mb-8">{t('auth.registerSubtitle')}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-2">{t('auth.registerTitle')}</h1>
+        <p className="text-sm text-muted-foreground text-center mb-8">{t('auth.registerSubtitle')}</p>
 
         {(
           [
@@ -156,7 +156,7 @@ function RegisterContent() {
           ] as const
         ).map(({ id, labelKey, type, autoComplete }) => (
           <div key={id} className="mb-4">
-            <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor={id} className="block text-sm font-medium text-foreground mb-1.5">
               {t(labelKey)}
             </label>
             <input
@@ -169,7 +169,7 @@ function RegisterContent() {
               aria-describedby={`${id}-error`}
             />
             {errors[id] && (
-              <p id={`${id}-error`} className="text-red-600 text-xs mt-1.5">
+              <p id={`${id}-error`} className="text-danger text-xs mt-1.5">
                 {errors[id]?.message}
               </p>
             )}
@@ -177,7 +177,7 @@ function RegisterContent() {
         ))}
 
         <div className="mb-4">
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
             {t('auth.password')}
           </label>
           <div className="relative">
@@ -193,14 +193,14 @@ function RegisterContent() {
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
           {errors.password && (
-            <p id="password-error" className="text-red-600 text-xs mt-1.5">
+            <p id="password-error" className="text-danger text-xs mt-1.5">
               {errors.password.message}
             </p>
           )}
@@ -212,7 +212,7 @@ function RegisterContent() {
         </div>
 
         <div className="mb-6">
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1.5">
             {t('auth.confirmPassword')}
           </label>
           <div className="relative">
@@ -228,21 +228,21 @@ function RegisterContent() {
             <button
               type="button"
               onClick={() => setShowConfirmPassword((v) => !v)}
-              className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               aria-label={showConfirmPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             >
               {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
           {errors.confirmPassword && (
-            <p id="confirmPassword-error" className="text-red-600 text-xs mt-1.5">
+            <p id="confirmPassword-error" className="text-danger text-xs mt-1.5">
               {errors.confirmPassword.message}
             </p>
           )}
         </div>
 
         {error && (
-          <div role="alert" className="text-sm text-red-700 text-center mb-4 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+          <div role="alert" className="text-sm text-danger text-center mb-4 bg-danger/10 border border-danger/20 rounded-xl px-3 py-2.5">
             {error}
           </div>
         )}
@@ -253,9 +253,9 @@ function RegisterContent() {
 
         <GoogleSignInButton onSuccess={onGoogleSuccess} />
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-muted-foreground">
           {t('auth.haveAccount')}{' '}
-          <Link href="/login" className="text-blue-600 font-medium hover:underline">
+          <Link href="/login" className="text-primary font-medium hover:underline">
             {t('auth.loginHere')}
           </Link>
         </p>

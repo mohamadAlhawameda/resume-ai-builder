@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -15,22 +15,31 @@ import {
   Target,
   Sparkles,
   ClipboardList,
+  Gauge,
+  ListChecks,
+  Trophy,
+  CalendarClock,
+  Puzzle,
+  Bell,
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Badge, { scoreTone } from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
-import { scoreColor } from '@/components/ui/ScoreRing';
+import ScoreRing from '@/components/ui/ScoreRing';
+import { TrendLine } from '@/components/ui/Chart';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getUser, isLoggedIn, type StoredUser } from '@/lib/auth';
-import type { ResumeRecord, ScanHistoryItem, SavedJob, Job, NextAction } from '@/lib/types';
+import type { ResumeRecord, ScanHistoryItem, SavedJob, Job, NextAction, CareerProfile } from '@/lib/types';
 import { useLocale } from '@/i18n/LocaleProvider';
 
 interface Profile {
   targetRole: string;
   industry: string;
 }
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -42,6 +51,7 @@ export default function DashboardPage() {
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
   const [topJobs, setTopJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<Profile>({ targetRole: '', industry: '' });
+  const [careerProfile, setCareerProfile] = useState<CareerProfile | null>(null);
   const [editingTarget, setEditingTarget] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
@@ -63,6 +73,7 @@ export default function DashboardPage() {
         api<{ jobs: Job[] }>('/jobs/recommended'),
         api<{ user: { targetRole: string; industry: string } }>('/auth/me'),
         api<NextAction>('/profile/next-action'),
+        api<CareerProfile>('/profile'),
       ]);
       if (results[0].status === 'fulfilled') setResumes(results[0].value);
       if (results[1].status === 'fulfilled') setHistory(results[1].value);
@@ -75,6 +86,7 @@ export default function DashboardPage() {
         });
       }
       if (results[5].status === 'fulfilled') setNextAction(results[5].value);
+      if (results[6].status === 'fulfilled') setCareerProfile(results[6].value);
       if (results[0].status === 'rejected') {
         toast.error(apiErrorMessage(results[0].reason, t('dashboardPage.toastLoadResumesError')));
       }
@@ -102,6 +114,47 @@ export default function DashboardPage() {
   const previousScore = scans[1]?.overall ?? null;
   const scoreDelta = latestScore !== null && previousScore !== null ? latestScore - previousScore : null;
   const applications = savedJobs.filter((j) => j.status !== 'saved').length;
+
+  const chartData = useMemo(
+    () =>
+      [...scans]
+        .reverse()
+        .slice(-12)
+        .map((s, i) => ({
+          label: formatDate(s.createdAt, { month: 'short', day: 'numeric' }),
+          score: s.overall ?? 0,
+          key: s._id || i,
+        })),
+    [scans, formatDate]
+  );
+
+  // Missing skills: the deficits that show up most often across today's top
+  // matches — a compact, actionable slice of what Radar/Simulator show in full.
+  const missingSkills = useMemo(() => {
+    const freq = new Map<string, number>();
+    for (const job of topJobs) {
+      for (const skill of job.match?.missingSkills || []) {
+        freq.set(skill, (freq.get(skill) || 0) + 1);
+      }
+    }
+    return [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([skill]) => skill);
+  }, [topJobs]);
+
+  const recentAchievements = useMemo(
+    () =>
+      [...(careerProfile?.vault || [])]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 3),
+    [careerProfile]
+  );
+
+  const weekStats = useMemo(() => {
+    const since = Date.now() - ONE_WEEK_MS;
+    const scansThisWeek = history.filter((h) => h.type === 'scan' && new Date(h.createdAt).getTime() >= since).length;
+    const applicationsThisWeek = savedJobs.filter((j) => j.appliedAt && new Date(j.appliedAt).getTime() >= since).length;
+    const savedThisWeek = savedJobs.filter((j) => new Date(j.createdAt || j.appliedAt || 0).getTime() >= since).length;
+    return { scansThisWeek, applicationsThisWeek, savedThisWeek };
+  }, [history, savedJobs]);
 
   const stats = [
     {
@@ -180,10 +233,10 @@ export default function DashboardPage() {
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
       >
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             {t('dashboardPage.welcomeBack', { name: user?.name?.split(' ')[0] || t('dashboardPage.thereFallback') })}
           </h1>
-          <p className="text-slate-500 mt-1 text-sm sm:text-base">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             {profile.targetRole
               ? profile.industry
                 ? t('dashboardPage.workingTowardWithIndustry', { role: profile.targetRole, industry: profile.industry })
@@ -204,13 +257,18 @@ export default function DashboardPage() {
       {/* Career Concierge — always the one next best action */}
       {nextAction && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-8">
-          <div className="flex items-center gap-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl px-5 py-4 shadow-md shadow-blue-600/20">
+          <div className="flex items-center gap-4 bg-gradient-to-r from-primary to-accent rounded-2xl px-5 py-4 shadow-md shadow-primary/20">
             <span className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center shrink-0">
               <Sparkles className="w-4.5 h-4.5 text-white" aria-hidden />
             </span>
-            <p className="text-sm text-white flex-1">{nextAction.action}</p>
-            <Button size="sm" variant="outline" className="shrink-0" onClick={() => router.push(nextAction.href)}>
-              {t('dashboardPage.go')} <ArrowRight className="w-3.5 h-3.5" />
+            <p className="text-sm text-white flex-1">{t(`dashboardPage.nextAction.${nextAction.key}`, nextAction.params)}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 !bg-white/95 !text-primary !border-white/60 hover:!bg-white"
+              onClick={() => router.push(nextAction.href)}
+            >
+              {t('dashboardPage.go')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
             </Button>
           </div>
         </motion.div>
@@ -230,10 +288,10 @@ export default function DashboardPage() {
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br text-white shadow-md ${s.color}`}>
                   <s.icon className="w-5 h-5" aria-hidden />
                 </div>
-                <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-                <p className="text-sm text-slate-500">{s.label}</p>
+                <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                <p className="text-sm text-muted-foreground">{s.label}</p>
                 {s.sub && (
-                  <p className={`text-xs font-medium mt-0.5 ${scoreDelta !== null && scoreDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <p className={`text-xs font-medium mt-0.5 ${scoreDelta !== null && scoreDelta >= 0 ? 'text-success' : 'text-danger'}`}>
                     {s.sub}
                   </p>
                 )}
@@ -248,10 +306,10 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Recent resumes */}
           <Card padded={false}>
-            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">{t('dashboardPage.yourResumes')}</h2>
-              <Link href="/resumes" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
-                {t('dashboardPage.viewAll')} <ArrowRight className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border">
+              <h2 className="font-semibold text-foreground">{t('dashboardPage.yourResumes')}</h2>
+              <Link href="/resumes" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+                {t('dashboardPage.viewAll')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
               </Link>
             </div>
             {resumes.length === 0 ? (
@@ -262,17 +320,17 @@ export default function DashboardPage() {
                 action={<Button onClick={() => router.push('/resume')}>{t('dashboardPage.createResume')}</Button>}
               />
             ) : (
-              <ul className="divide-y divide-slate-50">
+              <ul className="divide-y divide-border">
                 {resumes.slice(0, 4).map((r) => (
-                  <li key={r._id} className="flex items-center gap-4 px-5 sm:px-6 py-4 hover:bg-slate-50/60 transition">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <li key={r._id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 px-5 sm:px-6 py-4 hover:bg-surface-hover transition">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-slate-900 truncate">
+                      <p className="font-medium text-foreground truncate">
                         {r.title || r.data?.fullName || t('dashboardPage.untitledResume')}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         {t('dashboardPage.updatedOn', { date: formatDate(r.updatedAt) })}
                         {r.templateId && ` · ${t('dashboardPage.templateSuffix', { template: r.templateId })}`}
                       </p>
@@ -293,12 +351,12 @@ export default function DashboardPage() {
 
           {/* Scan history / progress */}
           <Card padded={false}>
-            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-purple-500" aria-hidden /> {t('dashboardPage.scoreProgress')}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-accent" aria-hidden /> {t('dashboardPage.scoreProgress')}
               </h2>
-              <Link href="/analyze" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
-                {t('dashboardPage.newScan')} <ArrowRight className="w-3.5 h-3.5" />
+              <Link href="/analyze" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+                {t('dashboardPage.newScan')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
               </Link>
             </div>
             {scans.length === 0 ? (
@@ -309,29 +367,19 @@ export default function DashboardPage() {
                 action={<Button variant="outline" onClick={() => router.push('/analyze')}>{t('dashboardPage.runFirstScan')}</Button>}
               />
             ) : (
-              <div className="px-5 sm:px-6 py-5">
-                {/* Simple score trend bars (oldest → newest) */}
-                <div className="flex items-end gap-1.5 h-24 mb-4" role="img" aria-label={t('dashboardPage.scoreHistoryChart')}>
-                  {[...scans].reverse().slice(-12).map((s, i) => (
-                    <div key={s._id || i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                      <div
-                        className="w-full rounded-t-md transition-all duration-500 min-h-[6px]"
-                        style={{
-                          height: `${Math.max(6, (s.overall || 0) * 0.9)}%`,
-                          backgroundColor: scoreColor(s.overall || 0),
-                          opacity: 0.85,
-                        }}
-                      />
-                      <span className="absolute -top-6 hidden group-hover:block text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
-                        {s.overall}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <ul className="space-y-2">
+              <div className="px-3 sm:px-6 py-5">
+                {chartData.length >= 2 ? (
+                  <TrendLine data={chartData} xKey="label" yKey="score" height={180} ariaLabel={t('dashboardPage.scoreHistoryChart')} />
+                ) : (
+                  <div className="flex items-center gap-4 px-2 py-2">
+                    <ScoreRing score={chartData[0]?.score ?? 0} size={72} strokeWidth={7} />
+                    <p className="text-sm text-muted-foreground">{t('dashboardPage.noScansDescription')}</p>
+                  </div>
+                )}
+                <ul className="space-y-2 mt-4 px-2 sm:px-0">
                   {history.slice(0, 4).map((h) => (
                     <li key={h._id} className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600 truncate">
+                      <span className="text-muted-foreground truncate">
                         {h.type === 'scan'
                           ? t('dashboardPage.resumeScanLabel')
                           : h.jobTitle
@@ -342,7 +390,7 @@ export default function DashboardPage() {
                         <Badge tone={scoreTone(h.overall ?? h.matchPercent ?? 0)}>
                           {h.type === 'scan' ? `${h.overall}/100` : t('dashboardPage.matchPercent', { n: h.matchPercent ?? 0 })}
                         </Badge>
-                        <span className="text-xs text-slate-400 w-16 text-right">
+                        <span className="text-xs text-muted-foreground w-16 text-end">
                           {formatDate(h.createdAt)}
                         </span>
                       </span>
@@ -352,19 +400,40 @@ export default function DashboardPage() {
               </div>
             )}
           </Card>
+
+          {/* Your week at a glance */}
+          <div>
+            <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+              <CalendarClock className="w-4 h-4 text-accent" aria-hidden /> {t('dashboardPage.yourWeek')}
+            </h2>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <Card>
+                <p className="text-2xl font-bold text-foreground">{weekStats.scansThisWeek}</p>
+                <p className="text-sm text-muted-foreground">{t('dashboardPage.weekScans')}</p>
+              </Card>
+              <Card>
+                <p className="text-2xl font-bold text-foreground">{weekStats.applicationsThisWeek}</p>
+                <p className="text-sm text-muted-foreground">{t('dashboardPage.weekApplications')}</p>
+              </Card>
+              <Card>
+                <p className="text-2xl font-bold text-foreground">{weekStats.savedThisWeek}</p>
+                <p className="text-sm text-muted-foreground">{t('dashboardPage.weekSaved')}</p>
+              </Card>
+            </div>
+          </div>
         </div>
 
         {/* Right column */}
         <div className="space-y-6">
           {/* Career target */}
           <Card id="target">
-            <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-3">
-              <Target className="w-4 h-4 text-blue-500" aria-hidden /> {t('dashboardPage.careerTarget')}
+            <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+              <Target className="w-4 h-4 text-primary" aria-hidden /> {t('dashboardPage.careerTarget')}
             </h2>
             {editingTarget ? (
               <div className="space-y-3">
                 <div>
-                  <label htmlFor="targetRole" className="block text-xs font-medium text-slate-600 mb-1">
+                  <label htmlFor="targetRole" className="block text-xs font-medium text-muted-foreground mb-1">
                     {t('dashboardPage.targetRoleLabel')}
                   </label>
                   <input
@@ -372,11 +441,11 @@ export default function DashboardPage() {
                     value={profile.targetRole}
                     onChange={(e) => setProfile((p) => ({ ...p, targetRole: e.target.value }))}
                     placeholder={t('dashboardPage.targetRolePlaceholder')}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label htmlFor="industry" className="block text-xs font-medium text-slate-600 mb-1">
+                  <label htmlFor="industry" className="block text-xs font-medium text-muted-foreground mb-1">
                     {t('dashboardPage.industryLabel')}
                   </label>
                   <input
@@ -384,7 +453,7 @@ export default function DashboardPage() {
                     value={profile.industry}
                     onChange={(e) => setProfile((p) => ({ ...p, industry: e.target.value }))}
                     placeholder={t('dashboardPage.industryPlaceholder')}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -399,12 +468,12 @@ export default function DashboardPage() {
             ) : (
               <div>
                 {profile.targetRole ? (
-                  <p className="text-sm text-slate-700">
+                  <p className="text-sm text-foreground">
                     <span className="font-medium">{profile.targetRole}</span>
-                    {profile.industry && <span className="text-slate-500"> · {profile.industry}</span>}
+                    {profile.industry && <span className="text-muted-foreground"> · {profile.industry}</span>}
                   </p>
                 ) : (
-                  <p className="text-sm text-slate-500">{t('dashboardPage.targetNotSet')}</p>
+                  <p className="text-sm text-muted-foreground">{t('dashboardPage.targetNotSet')}</p>
                 )}
                 <Button size="sm" variant="outline" className="mt-3" onClick={() => setEditingTarget(true)}>
                   {profile.targetRole ? t('dashboardPage.edit') : t('dashboardPage.setTarget')}
@@ -413,20 +482,42 @@ export default function DashboardPage() {
             )}
           </Card>
 
+          {/* Career progress — how close to the goal, at a glance */}
+          {careerProfile && (
+            <Card>
+              <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+                <Gauge className="w-4 h-4 text-primary" aria-hidden /> {t('dashboardPage.careerProgress')}
+              </h2>
+              <div className="flex items-center gap-4">
+                <ScoreRing score={careerProfile.completionPct} size={76} strokeWidth={7} animate={false} />
+                <p className="text-sm text-muted-foreground flex-1">
+                  {careerProfile.completionPct >= 90
+                    ? t('dashboardPage.progressComplete')
+                    : t('dashboardPage.progressIncomplete')}
+                </p>
+              </div>
+              {careerProfile.completionPct < 90 && (
+                <Link href="/profile" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                  {t('dashboardPage.completeProfile')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
+                </Link>
+              )}
+            </Card>
+          )}
+
           {/* Recommendations */}
           {recommendations.length > 0 && (
             <Card>
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-amber-500" aria-hidden /> {t('dashboardPage.recommendedNextSteps')}
+              <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+                <ListChecks className="w-4 h-4 text-warning" aria-hidden /> {t('dashboardPage.recommendedNextSteps')}
               </h2>
               <ul className="space-y-2.5">
                 {recommendations.slice(0, 4).map((rec, i) => (
                   <li key={i}>
                     <Link
                       href={rec.href}
-                      className="flex items-start gap-2 text-sm text-slate-600 hover:text-blue-700 transition group"
+                      className="flex items-start gap-2 text-sm text-muted-foreground hover:text-primary transition group"
                     >
-                      <ArrowRight className="w-4 h-4 mt-0.5 text-blue-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                      <ArrowRight className="w-4 h-4 mt-0.5 text-primary/60 group-hover:translate-x-0.5 rtl-flip transition-transform shrink-0" />
                       {rec.text}
                     </Link>
                   </li>
@@ -435,31 +526,81 @@ export default function DashboardPage() {
             </Card>
           )}
 
+          {/* Missing skills — the recurring gaps across today's top matches */}
+          {missingSkills.length > 0 && (
+            <Card>
+              <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+                <Puzzle className="w-4 h-4 text-accent" aria-hidden /> {t('dashboardPage.missingSkills')}
+              </h2>
+              <div className="flex flex-wrap gap-1.5">
+                {missingSkills.map((skill) => (
+                  <Badge key={skill} tone="slate">{skill}</Badge>
+                ))}
+              </div>
+              <Link href="/radar" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                {t('dashboardPage.seeSkillImpact')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
+              </Link>
+            </Card>
+          )}
+
           {/* Top job matches */}
           <Card padded={false}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">{t('dashboardPage.topJobMatches')}</h2>
-              <Link href="/jobs" className="text-sm font-medium text-blue-600 hover:underline">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h2 className="font-semibold text-foreground">{t('dashboardPage.topJobMatches')}</h2>
+              <Link href="/jobs" className="text-sm font-medium text-primary hover:underline">
                 {t('dashboardPage.allJobs')}
               </Link>
             </div>
             {topJobs.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-slate-500">{t('dashboardPage.jobMatchesEmpty')}</p>
+              <p className="px-5 py-6 text-sm text-muted-foreground">{t('dashboardPage.jobMatchesEmpty')}</p>
             ) : (
-              <ul className="divide-y divide-slate-50">
+              <ul className="divide-y divide-border">
                 {topJobs.map((job) => (
                   <li key={job.id} className="px-5 py-3.5">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-sm text-slate-900 truncate">{job.title}</p>
+                      <p className="font-medium text-sm text-foreground truncate">{job.title}</p>
                       {job.match && <Badge tone={scoreTone(job.match.percent)}>{job.match.percent}%</Badge>}
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {job.company} · {job.location}
                     </p>
                   </li>
                 ))}
               </ul>
             )}
+          </Card>
+
+          {/* Recent achievements — from the Career Vault */}
+          <Card>
+            <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+              <Trophy className="w-4 h-4 text-warning" aria-hidden /> {t('dashboardPage.recentAchievements')}
+            </h2>
+            {recentAchievements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('dashboardPage.noAchievements')}</p>
+            ) : (
+              <ul className="space-y-3">
+                {recentAchievements.map((a) => (
+                  <li key={a._id} className="text-sm text-foreground border-s-2 border-warning/40 ps-3">
+                    <p className="line-clamp-2">{a.text}</p>
+                    {a.metric && <p className="text-xs text-success font-medium mt-0.5">{a.metric}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link href="/profile?tab=vault" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              {t('dashboardPage.openVault')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
+            </Link>
+          </Card>
+
+          {/* Upcoming tasks — reminders/follow-ups land here once Networking ships */}
+          <Card>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
+                <Bell className="w-4 h-4 text-muted-foreground" aria-hidden /> {t('dashboardPage.upcomingTasks')}
+              </h2>
+              <Badge tone="slate">{t('dashboardPage.comingSoon')}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">{t('dashboardPage.upcomingTasksDescription')}</p>
           </Card>
         </div>
       </div>

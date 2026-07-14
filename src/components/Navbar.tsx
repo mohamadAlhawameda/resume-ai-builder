@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Menu,
+  Menu as MenuIcon,
   X,
   Bell,
   FileText,
@@ -27,6 +27,8 @@ import { api } from '@/lib/api';
 import { APP_NAME_PRIMARY, APP_NAME_ACCENT } from '@/lib/config';
 import { useLocale } from '@/i18n/LocaleProvider';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeToggle from '@/components/ThemeToggle';
+import { Menu, MenuButton, MenuItems, MenuItem, MenuLink } from '@/components/ui/Menu';
 import type { AppNotification } from '@/lib/types';
 
 // Kept to 3 core sections on the top-level bar — Analyze/Radar/AI Tools live
@@ -50,36 +52,14 @@ export default function Navbar() {
   const { t } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const isAuthenticated = useAuthStatus();
-  const menuRef = useRef<HTMLDivElement>(null);
-  const notifRef = useRef<HTMLDivElement>(null);
-  const toolsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setIsClient(true), []);
 
-  // Close menus when navigating
-  useEffect(() => {
-    setIsOpen(false);
-    setUserMenuOpen(false);
-    setNotifOpen(false);
-    setToolsOpen(false);
-  }, [pathname]);
-
-  // Click-outside to close dropdowns
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
-      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) setToolsOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
+  // Close the mobile panel when navigating
+  useEffect(() => setIsOpen(false), [pathname]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -119,24 +99,24 @@ export default function Navbar() {
     clsx(
       'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap shrink-0',
       active
-        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
-        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+        ? 'bg-gradient-to-r from-primary/10 to-accent/10 text-primary ring-1 ring-primary/20'
+        : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
     );
 
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center gap-4">
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900 hover:opacity-80 transition shrink-0"
+          className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition shrink-0"
         >
-          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-sm shadow-blue-600/30">
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center shadow-sm shadow-primary/30">
             <FileText className="w-4.5 h-4.5" aria-hidden />
           </span>
           <span>
             {APP_NAME_PRIMARY}
-            {APP_NAME_ACCENT && <span className="text-blue-600"> {APP_NAME_ACCENT}</span>}
+            {APP_NAME_ACCENT && <span className="text-primary"> {APP_NAME_ACCENT}</span>}
           </span>
         </Link>
 
@@ -153,56 +133,30 @@ export default function Navbar() {
             ))}
 
             {/* Tools dropdown — groups Analyze / Opportunity Radar / AI Tools */}
-            <div className="relative" ref={toolsRef}>
-              <button
-                onClick={() => setToolsOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={toolsOpen}
-                className={navLinkClass(toolsActive)}
-              >
+            <Menu key={pathname}>
+              <MenuButton className={clsx('group', navLinkClass(toolsActive))}>
                 <LayoutGrid className="w-4 h-4 shrink-0" aria-hidden />
                 {t('nav.tools')}
-                <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', toolsOpen && 'rotate-180')} aria-hidden />
-              </button>
-              <AnimatePresence>
-                {toolsOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute start-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-2"
-                    role="menu"
-                  >
-                    {TOOLS_LINKS.map(({ href, labelKey, icon: Icon }) => (
-                      <Link
-                        key={href}
-                        href={href}
-                        role="menuitem"
-                        aria-current={isActive(href) ? 'page' : undefined}
-                        className={clsx(
-                          'flex items-center gap-2.5 px-4 py-2 text-sm transition',
-                          isActive(href) ? 'text-blue-700 bg-blue-50/60' : 'text-slate-700 hover:bg-slate-50'
-                        )}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" aria-hidden />
-                        {t(labelKey)}
-                      </Link>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                <ToolsChevron />
+              </MenuButton>
+              <MenuItems width="w-56">
+                {TOOLS_LINKS.map(({ href, labelKey, icon: Icon }) => (
+                  <MenuLink key={href} href={href} active={isActive(href)} icon={<Icon className="w-4 h-4 shrink-0" aria-hidden />}>
+                    {t(labelKey)}
+                  </MenuLink>
+                ))}
+              </MenuItems>
+            </Menu>
           </nav>
         )}
 
-        <div className="flex items-center gap-2 shrink-0 ms-auto">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 ms-auto">
           {/* Primary create-action — a distinct CTA rather than a plain nav
               pill, so it reads as "the thing you do here," not just another link. */}
           {authed && (
             <Link
               href="/resume"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-b from-blue-600 to-blue-700 text-white hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-b from-primary to-primary-hover text-primary-foreground hover:brightness-110 shadow-sm shadow-primary/25 transition"
             >
               <FilePlus2 className="w-4 h-4" aria-hidden />
               {t('nav.newResume')}
@@ -212,128 +166,76 @@ export default function Navbar() {
           {authed ? (
             <>
               {/* Notifications */}
-              <div className="relative" ref={notifRef}>
-                <button
-                  onClick={() => {
-                    setNotifOpen((v) => !v);
-                    if (!notifOpen) loadNotifications();
-                  }}
-                  aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
-                  className="relative p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
+              <Menu key={`notif-${pathname}`}>
+                <MenuButton
+                  onClick={() => loadNotifications()}
+                  aria-label={`${t('nav.notifications')}${unread > 0 ? ` (${unread})` : ''}`}
+                  className="relative min-w-11 min-h-11 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover transition"
                 >
                   <Bell className="w-5 h-5" />
                   {unread > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="absolute top-1 end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-danger-foreground text-[10px] font-bold flex items-center justify-center">
                       {unread > 9 ? '9+' : unread}
                     </span>
                   )}
-                </button>
-                <AnimatePresence>
-                  {notifOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute end-0 mt-2 w-80 max-w-[90vw] bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden"
-                    >
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                        <span className="text-sm font-semibold text-slate-900">{t('nav.notifications')}</span>
-                        {unread > 0 && (
-                          <button onClick={markAllRead} className="text-xs font-medium text-blue-600 hover:underline">
-                            {t('nav.markAllRead')}
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-80 overflow-y-auto thin-scrollbar">
-                        {notifications.length === 0 ? (
-                          <p className="px-4 py-8 text-center text-sm text-slate-500">
-                            {t('nav.noNotifications')}
+                </MenuButton>
+                <MenuItems width="w-80" className="p-0 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                    <span className="text-sm font-semibold text-foreground">{t('nav.notifications')}</span>
+                    {unread > 0 && (
+                      <button onClick={markAllRead} className="text-xs font-medium text-primary hover:underline">
+                        {t('nav.markAllRead')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto thin-scrollbar">
+                    {notifications.length === 0 ? (
+                      <p className="px-4 py-8 text-center text-sm text-muted-foreground">{t('nav.noNotifications')}</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <div key={n._id} className={clsx('px-4 py-3 border-b border-border last:border-0', !n.read && 'bg-primary/5')}>
+                          <p className="text-sm font-medium text-foreground">{n.title}</p>
+                          {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
+                          <p className="text-[11px] text-muted-foreground/80 mt-1">
+                            {new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                           </p>
-                        ) : (
-                          notifications.map((n) => (
-                            <div
-                              key={n._id}
-                              className={clsx(
-                                'px-4 py-3 border-b border-slate-50 last:border-0',
-                                !n.read && 'bg-blue-50/50'
-                              )}
-                            >
-                              <p className="text-sm font-medium text-slate-900">{n.title}</p>
-                              {n.body && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.body}</p>}
-                              <p className="text-[11px] text-slate-400 mt-1">
-                                {new Date(n.createdAt).toLocaleDateString(undefined, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                      {notifications.some((n) => n.type === 'job-match') && (
-                        <Link
-                          href="/jobs"
-                          className="block px-4 py-2.5 text-center text-sm font-medium text-blue-600 hover:bg-blue-50 border-t border-slate-100 transition"
-                        >
-                          {t('nav.viewJobMatches')}
-                        </Link>
-                      )}
-                    </motion.div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {notifications.some((n) => n.type === 'job-match') && (
+                    <Link
+                      href="/jobs"
+                      className="block px-4 py-2.5 text-center text-sm font-medium text-primary hover:bg-primary/5 border-t border-border transition"
+                    >
+                      {t('nav.viewJobMatches')}
+                    </Link>
                   )}
-                </AnimatePresence>
-              </div>
+                </MenuItems>
+              </Menu>
 
               {/* User menu (desktop) — Career Profile lives here, next to
                   Logout, rather than as a 4th top-level nav pill. */}
-              <div className="relative hidden md:block" ref={menuRef}>
-                <button
-                  onClick={() => setUserMenuOpen((v) => !v)}
-                  className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition"
-                  aria-haspopup="menu"
-                  aria-expanded={userMenuOpen}
-                >
-                  <span className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-xs font-bold flex items-center justify-center shadow-sm shadow-blue-600/30">
+              <Menu key={`user-${pathname}`} className="hidden md:block">
+                <MenuButton className="flex items-center gap-2 ps-1.5 pe-2.5 min-h-11 rounded-full border border-border hover:border-border-strong hover:bg-surface-hover transition">
+                  <span className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground text-xs font-bold flex items-center justify-center shadow-sm shadow-primary/30">
                     {user?.name?.[0]?.toUpperCase() || 'U'}
                   </span>
-                  <ChevronDown className="w-4 h-4 text-slate-400" aria-hidden />
-                </button>
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 8 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute end-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-2"
-                      role="menu"
-                    >
-                      <div className="px-4 py-2 border-b border-slate-100 mb-1">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{user?.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{user?.email}</p>
-                      </div>
-                      <Link
-                        href="/profile"
-                        role="menuitem"
-                        aria-current={isActive('/profile') ? 'page' : undefined}
-                        className={clsx(
-                          'flex items-center gap-2 px-4 py-2 text-sm transition',
-                          isActive('/profile') ? 'text-blue-700 bg-blue-50/60' : 'text-slate-700 hover:bg-slate-50'
-                        )}
-                      >
-                        <UserCircle2 className="w-4 h-4" aria-hidden /> {t('nav.profile')}
-                      </Link>
-                      <button
-                        onClick={handleLogout}
-                        role="menuitem"
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition"
-                      >
-                        <LogOut className="w-4 h-4" aria-hidden /> {t('nav.logout')}
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" aria-hidden />
+                </MenuButton>
+                <MenuItems align="end" width="w-56">
+                  <div className="px-4 py-2 border-b border-border mb-1">
+                    <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                  <MenuLink href="/profile" active={isActive('/profile')} icon={<UserCircle2 className="w-4 h-4" aria-hidden />}>
+                    {t('nav.profile')}
+                  </MenuLink>
+                  <MenuItem danger onClick={handleLogout} icon={<LogOut className="w-4 h-4" aria-hidden />}>
+                    {t('nav.logout')}
+                  </MenuItem>
+                </MenuItems>
+              </Menu>
             </>
           ) : (
             isClient && (
@@ -342,14 +244,14 @@ export default function Navbar() {
                   href="/login"
                   className={clsx(
                     'text-sm font-medium px-4 py-2 rounded-lg transition',
-                    isActive('/login') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    isActive('/login') ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
                   )}
                 >
                   {t('nav.login')}
                 </Link>
                 <Link
                   href="/register"
-                  className="text-sm px-4 py-2 bg-gradient-to-b from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
+                  className="text-sm px-4 py-2 bg-gradient-to-b from-primary to-primary-hover text-primary-foreground font-semibold rounded-lg hover:brightness-110 shadow-sm shadow-primary/25 transition"
                 >
                   {t('nav.getStarted')}
                 </Link>
@@ -357,16 +259,17 @@ export default function Navbar() {
             )
           )}
 
+          <ThemeToggle />
           <LanguageSwitcher className="hidden md:block" />
 
           {/* Mobile hamburger */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="lg:hidden p-2 rounded-lg text-slate-700 hover:bg-slate-100 transition"
-            aria-label={isOpen ? 'Close menu' : 'Open menu'}
+            className="lg:hidden min-w-11 min-h-11 flex items-center justify-center rounded-lg text-foreground hover:bg-surface-hover transition"
+            aria-label={isOpen ? t('nav.closeMenu') : t('nav.openMenu')}
             aria-expanded={isOpen}
           >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {isOpen ? <X className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
           </button>
         </div>
       </div>
@@ -384,7 +287,7 @@ export default function Navbar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="lg:hidden bg-white border-t border-slate-100"
+            className="lg:hidden bg-surface border-t border-border"
             aria-label="Mobile"
           >
             <div className="px-4 py-3 space-y-1">
@@ -392,7 +295,7 @@ export default function Navbar() {
                 <Link
                   href="/resume"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 mb-2 rounded-xl text-sm font-semibold bg-gradient-to-b from-blue-600 to-blue-700 text-white shadow-sm shadow-blue-600/25 transition"
+                  className="flex items-center justify-center gap-1.5 px-3 py-3 mb-2 rounded-xl text-sm font-semibold bg-gradient-to-b from-primary to-primary-hover text-primary-foreground shadow-sm shadow-primary/25 transition"
                 >
                   <FilePlus2 className="w-4 h-4" aria-hidden /> {t('nav.newResume')}
                 </Link>
@@ -406,10 +309,10 @@ export default function Navbar() {
                     onClick={() => setIsOpen(false)}
                     aria-current={isActive(href) ? 'page' : undefined}
                     className={clsx(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
+                      'flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition min-h-11',
                       isActive(href)
-                        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
-                        : 'text-slate-700 hover:bg-slate-100'
+                        ? 'bg-gradient-to-r from-primary/10 to-accent/10 text-primary ring-1 ring-primary/20'
+                        : 'text-foreground hover:bg-surface-hover'
                     )}
                   >
                     <Icon className="w-5 h-5" aria-hidden />
@@ -419,7 +322,7 @@ export default function Navbar() {
 
               {authed && (
                 <>
-                  <p className="px-3 pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('nav.tools')}</p>
+                  <p className="px-3 pt-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('nav.tools')}</p>
                   {TOOLS_LINKS.map(({ href, labelKey, icon: Icon }) => (
                     <Link
                       key={href}
@@ -427,10 +330,10 @@ export default function Navbar() {
                       onClick={() => setIsOpen(false)}
                       aria-current={isActive(href) ? 'page' : undefined}
                       className={clsx(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
+                        'flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition min-h-11',
                         isActive(href)
-                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
-                          : 'text-slate-700 hover:bg-slate-100'
+                          ? 'bg-gradient-to-r from-primary/10 to-accent/10 text-primary ring-1 ring-primary/20'
+                          : 'text-foreground hover:bg-surface-hover'
                       )}
                     >
                       <Icon className="w-5 h-5" aria-hidden />
@@ -440,11 +343,11 @@ export default function Navbar() {
                 </>
               )}
 
-              <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="pt-2 mt-2 border-t border-border flex items-center justify-between gap-2">
                 <LanguageSwitcher />
               </div>
 
-              <div className="pt-2 mt-2 border-t border-slate-100">
+              <div className="pt-2 mt-2 border-t border-border">
                 {authed ? (
                   <>
                     <Link
@@ -452,10 +355,10 @@ export default function Navbar() {
                       onClick={() => setIsOpen(false)}
                       aria-current={isActive('/profile') ? 'page' : undefined}
                       className={clsx(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition',
+                        'flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition min-h-11',
                         isActive('/profile')
-                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-blue-100'
-                          : 'text-slate-700 hover:bg-slate-100'
+                          ? 'bg-gradient-to-r from-primary/10 to-accent/10 text-primary ring-1 ring-primary/20'
+                          : 'text-foreground hover:bg-surface-hover'
                       )}
                     >
                       <UserCircle2 className="w-5 h-5" aria-hidden /> {t('nav.profile')}
@@ -465,7 +368,7 @@ export default function Navbar() {
                         setIsOpen(false);
                         handleLogout();
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-danger hover:bg-danger/10 transition min-h-11"
                     >
                       <LogOut className="w-5 h-5" aria-hidden /> {t('nav.logout')}
                     </button>
@@ -475,14 +378,14 @@ export default function Navbar() {
                     <Link
                       href="/login"
                       onClick={() => setIsOpen(false)}
-                      className="text-center text-sm font-medium px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
+                      className="text-center text-sm font-medium px-4 py-2.5 rounded-xl border border-border-strong text-foreground hover:bg-surface-hover transition min-h-11 flex items-center justify-center"
                     >
                       {t('nav.login')}
                     </Link>
                     <Link
                       href="/register"
                       onClick={() => setIsOpen(false)}
-                      className="text-center text-sm px-4 py-2.5 bg-gradient-to-b from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-500 hover:to-blue-600 shadow-sm shadow-blue-600/25 transition"
+                      className="text-center text-sm px-4 py-2.5 bg-gradient-to-b from-primary to-primary-hover text-primary-foreground font-semibold rounded-xl hover:brightness-110 shadow-sm shadow-primary/25 transition min-h-11 flex items-center justify-center"
                     >
                       {t('nav.getStarted')}
                     </Link>
@@ -495,4 +398,8 @@ export default function Navbar() {
       </AnimatePresence>
     </header>
   );
+}
+
+function ToolsChevron() {
+  return <ChevronDown className="w-3.5 h-3.5 transition-transform group-aria-expanded:rotate-180" aria-hidden />;
 }

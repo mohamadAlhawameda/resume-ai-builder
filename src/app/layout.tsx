@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Providers from "@/components/Providers";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,8 +46,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable}`}>
-      <body className="antialiased flex flex-col min-h-screen">
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="antialiased flex flex-col min-h-screen bg-background text-foreground">
+        {/* Sets the .dark class before first paint, based on the saved
+            preference (or OS preference) — must run before body content
+            renders to avoid a flash of the wrong theme. Plain inline script,
+            not a React effect, since effects run after paint. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <LocaleProvider>
           <a href="#main-content" className="skip-link">
             Skip to main content

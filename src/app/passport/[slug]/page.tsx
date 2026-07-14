@@ -8,10 +8,12 @@ import Badge from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useLocale } from '@/i18n/LocaleProvider';
 import type { PublicPassport } from '@/lib/types';
 import { toast } from 'react-toastify';
 
 export default function PublicPassportPage() {
+  const { t } = useLocale();
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
   const [data, setData] = useState<PublicPassport | null>(null);
@@ -24,9 +26,10 @@ export default function PublicPassportPage() {
       .then(setData)
       .catch((err) => {
         setNotFound(true);
-        toast.error(apiErrorMessage(err, 'This career passport is not available.'));
+        toast.error(apiErrorMessage(err, t('passportPage.notAvailable')));
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   if (loading) {
@@ -43,8 +46,8 @@ export default function PublicPassportPage() {
         <Card>
           <EmptyState
             icon={<Briefcase className="w-6 h-6" />}
-            title="Career passport not found"
-            description="This link may be disabled or no longer exists."
+            title={t('passportPage.notFoundTitle')}
+            description={t('passportPage.notFoundDescription')}
           />
         </Card>
       </div>
@@ -57,22 +60,19 @@ export default function PublicPassportPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{data.name}</h1>
         {data.headline && <p className="text-slate-600 mt-1">{data.headline}</p>}
         {data.resume && (
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              toast.info('Open this person\'s profile in the app to export their linked resume.');
-            }}
+          <button
+            type="button"
+            onClick={() => toast.info(t('passportPage.openInAppToast'))}
             className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-blue-600 hover:underline"
           >
-            <FileDown className="w-4 h-4" aria-hidden /> {data.resume.title || 'View resume'}
-          </a>
+            <FileDown className="w-4 h-4" aria-hidden /> {data.resume.title || t('passportPage.viewResume')}
+          </button>
         )}
       </Card>
 
       {data.skills.length > 0 && (
         <Card className="mb-6">
-          <h2 className="font-semibold text-slate-900 mb-3">Skills</h2>
+          <h2 className="font-semibold text-slate-900 mb-3">{t('passportPage.skills')}</h2>
           <div className="flex flex-wrap gap-1.5">
             {data.skills.map((s) => (
               <Badge key={s} tone="blue">{s}</Badge>
@@ -84,7 +84,7 @@ export default function PublicPassportPage() {
       {data.experience.length > 0 && (
         <Card className="mb-6">
           <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Briefcase className="w-4 h-4 text-blue-600" aria-hidden /> Experience
+            <Briefcase className="w-4 h-4 text-blue-600" aria-hidden /> {t('passportPage.experience')}
           </h2>
           <ul className="space-y-4">
             {data.experience.map((e, i) => (
@@ -101,7 +101,7 @@ export default function PublicPassportPage() {
       {data.education.length > 0 && (
         <Card className="mb-6">
           <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-violet-600" aria-hidden /> Education
+            <GraduationCap className="w-4 h-4 text-violet-600" aria-hidden /> {t('passportPage.education')}
           </h2>
           <ul className="space-y-2">
             {data.education.map((e, i) => (
@@ -116,7 +116,7 @@ export default function PublicPassportPage() {
       {data.projects.length > 0 && (
         <Card className="mb-6">
           <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <FolderGit2 className="w-4 h-4 text-emerald-600" aria-hidden /> Projects
+            <FolderGit2 className="w-4 h-4 text-emerald-600" aria-hidden /> {t('passportPage.projects')}
           </h2>
           <ul className="space-y-3">
             {data.projects.map((p, i) => (
@@ -132,7 +132,7 @@ export default function PublicPassportPage() {
       {data.certifications.length > 0 && (
         <Card>
           <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Award className="w-4 h-4 text-amber-600" aria-hidden /> Certifications
+            <Award className="w-4 h-4 text-amber-600" aria-hidden /> {t('passportPage.certifications')}
           </h2>
           <ul className="space-y-1.5">
             {data.certifications.map((c, i) => (

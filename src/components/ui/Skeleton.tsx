@@ -4,7 +4,7 @@ import clsx from 'clsx';
 export default function Skeleton({ className }: { className?: string }) {
   return (
     <div
-      className={clsx('animate-pulse rounded-lg bg-slate-200/70', className)}
+      className={clsx('animate-pulse rounded-lg bg-muted', className)}
       aria-hidden="true"
     />
   );

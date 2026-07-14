@@ -14,13 +14,13 @@ export default function ScoreBar({ label, score }: ScoreBarProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
+        <span className="text-sm font-medium text-foreground">{label}</span>
         <span className="text-sm font-bold tabular-nums" style={{ color }}>
           {clamped}
         </span>
       </div>
       <div
-        className="h-2 w-full rounded-full bg-slate-100 overflow-hidden"
+        className="h-2 w-full rounded-full bg-muted overflow-hidden"
         role="progressbar"
         aria-valuenow={clamped}
         aria-valuemin={0}

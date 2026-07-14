@@ -693,6 +693,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             </label>
             <input
               id="resumeNameModal"
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate: this field only exists inside a just-opened Modal, so moving focus into it matches the WAI-ARIA dialog pattern.
               autoFocus
               value={nameDraft}
               onChange={(e) => {

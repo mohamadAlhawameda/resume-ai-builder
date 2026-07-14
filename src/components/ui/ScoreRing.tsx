@@ -85,7 +85,7 @@ export default function ScoreRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#e2e8f0"
+          stroke="var(--border)"
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -103,7 +103,7 @@ export default function ScoreRing({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-bold text-slate-900" style={{ fontSize: size / 4 }}>
+        <span className="font-bold text-foreground" style={{ fontSize: size / 4 }}>
           {display}
         </span>
         <span className="text-xs font-medium" style={{ color }}>

@@ -388,13 +388,13 @@ function JobsContent() {
               <Card padded={false} className="p-4">
                 <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
                   <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+                    <Search className="w-4 h-4 text-slate-400 absolute start-3 top-1/2 -translate-y-1/2" aria-hidden />
                     <input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder={t('jobsPage.searchPlaceholder')}
                       aria-label={t('jobsPage.searchPlaceholder')}
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full ps-9 pe-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">

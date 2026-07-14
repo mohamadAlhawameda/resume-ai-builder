@@ -16,7 +16,9 @@
     "markAllRead": "Mark all read",
     "viewJobMatches": "View job matches",
     "tools": "Tools",
-    "newResume": "New Resume"
+    "newResume": "New Resume",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "footer": {
     "tagline": "Build standout resumes, scan them against ATS criteria, and discover jobs that actually match your experience — powered by AI.",
@@ -65,7 +67,16 @@
     "feature6Text": "Save jobs, track applied → interviewing → offer, and get alerts when a new job strongly matches your resume.",
     "ctaTitle": "Your next role is a better resume away",
     "ctaSubtitle": "Start free. Build, scan, and match in one sitting — most users finish their first resume in under 15 minutes.",
-    "ctaButton": "Create my resume"
+    "ctaButton": "Create my resume",
+    "mockBadge": "AI-powered analysis",
+    "mockScanTitle": "Resume scan",
+    "mockScoreDelta": "+12 since last scan",
+    "mockAts": "ATS compatibility",
+    "mockImpact": "Impact",
+    "mockKeywords": "Keywords",
+    "mockTopMatch": "Top job match",
+    "mockJobTitle": "Frontend Developer",
+    "mockCompany": "Northwind Labs · Hybrid"
   },
   "auth": {
     "loginTitle": "Welcome back",
@@ -102,7 +113,8 @@
   "language": {
     "en": "English",
     "ar": "العربية",
-    "fr": "Français"
+    "fr": "Français",
+    "changeLanguage": "Change language"
   },
   "common": {
     "scoreExcellent": "Excellent",
@@ -111,7 +123,24 @@
     "scoreNeedsWork": "Needs work",
     "scoreWeak": "Weak",
     "scoreDefaultLabel": "Score",
-    "ariaScoreLabel": "{label}: {score} out of 100"
+    "ariaScoreLabel": "{label}: {score} out of 100",
+    "switchToLightMode": "Switch to light mode",
+    "switchToDarkMode": "Switch to dark mode",
+    "loading": "Loading…",
+    "retry": "Try again",
+    "somethingWentWrong": "Something went wrong",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "or": "or",
+    "importPdfDocx": "Import PDF / DOCX",
+    "readingResume": "Reading your resume…",
+    "importFileTypeError": "Please choose a PDF or DOCX file.",
+    "importFileSizeError": "That file is over the 5 MB limit.",
+    "importSuccess": "Resume imported — review the details we detected.",
+    "importFailed": "Import failed — please try again.",
+    "googleSignInFailed": "Google sign-in failed — please try again."
   },
   "jobsPage": {
     "title": "Job Discovery",
@@ -224,6 +253,17 @@
     "scanResume": "Scan resume",
     "newResume": "New resume",
     "go": "Go",
+    "nextAction": {
+      "buildDigitalTwin": "Build your Career Digital Twin — add your experience and skills so every future recommendation is grounded in real evidence.",
+      "createFirstResume": "Create your first resume — upload an existing one or build from scratch in minutes.",
+      "runFirstScan": "Run your first resume scan to get a 100-point score and a fix-it plan.",
+      "improveScore": "Your latest score is {score}/100 — apply the top fixes to push it above 70.",
+      "checkRadar": "Check Opportunity Radar for jobs you qualify for right now.",
+      "achievementInterview": "Do the AI Achievement Interview to capture real metrics for your Career Vault.",
+      "generateRoadmap": "Generate your Career GPS — a personalized 30/90-day roadmap toward your target role.",
+      "setTargetRoles": "Set your target roles so matching and recommendations get sharper.",
+      "greatShape": "You're in great shape — check Opportunity Radar for new matches that came in today."
+    },
     "statResumes": "Resumes",
     "statLatestScore": "Latest score",
     "statSavedJobs": "Saved jobs",
@@ -268,7 +308,23 @@
     "allJobs": "All jobs",
     "jobMatchesEmpty": "Job matches appear once you have a resume saved.",
     "toastLoadResumesError": "Could not load your resumes.",
-    "toastTargetUpdated": "Career target updated"
+    "toastTargetUpdated": "Career target updated",
+    "yourWeek": "Your week at a glance",
+    "weekScans": "Scans this week",
+    "weekApplications": "Applications this week",
+    "weekSaved": "Jobs saved this week",
+    "careerProgress": "Career progress",
+    "progressComplete": "Your Career Digital Twin is in great shape — recommendations are as sharp as they can get.",
+    "progressIncomplete": "Fill in more of your Career Digital Twin so recommendations get sharper.",
+    "completeProfile": "Complete your profile",
+    "missingSkills": "Skills worth adding",
+    "seeSkillImpact": "See skill impact",
+    "recentAchievements": "Recent achievements",
+    "noAchievements": "Nothing in your Career Vault yet — the AI Achievement Interview can help you capture your first one.",
+    "openVault": "Open Career Vault",
+    "upcomingTasks": "Upcoming tasks",
+    "comingSoon": "Coming soon",
+    "upcomingTasksDescription": "Follow-up and interview reminders will appear here once the Networking feature ships — track recruiter conversations and never miss a follow-up."
   },
   "resumesPage": {
     "title": "My Resumes",
@@ -698,5 +754,17 @@
     "spacingCompact": "Compact",
     "spacingNormal": "Normal",
     "spacingRelaxed": "Relaxed"
+  },
+  "passportPage": {
+    "notFoundTitle": "Career passport not found",
+    "notFoundDescription": "This link may be disabled or no longer exists.",
+    "notAvailable": "This career passport is not available.",
+    "viewResume": "View resume",
+    "openInAppToast": "Open this person's profile in the app to export their linked resume.",
+    "skills": "Skills",
+    "experience": "Experience",
+    "education": "Education",
+    "projects": "Projects",
+    "certifications": "Certifications"
   }
 }

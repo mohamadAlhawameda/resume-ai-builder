@@ -476,56 +476,61 @@ router.get('/next-action', async (req, res) => {
     ]);
 
     const latestScore = scans[0]?.overall ?? null;
+    // Returns a translation key + params rather than English text — this
+    // endpoint has no locale system of its own, and duplicating one
+    // server-side would fork from the frontend's existing en/ar/fr messages.
+    // The frontend looks up `dashboardPage.nextAction.<key>` via its normal
+    // t() pipeline, same as every other piece of UI text in the app.
     const rules = [
       {
         when: (profile.experience || []).length === 0 && (profile.skills || []).length === 0,
-        action: 'Build your Career Digital Twin — add your experience and skills so every future recommendation is grounded in real evidence.',
+        key: 'buildDigitalTwin',
         href: '/profile',
       },
       {
         when: resumes.length === 0,
-        action: 'Create your first resume — upload an existing one or build from scratch in minutes.',
+        key: 'createFirstResume',
         href: '/resume',
       },
       {
         when: latestScore === null,
-        action: 'Run your first resume scan to get a 100-point score and a fix-it plan.',
+        key: 'runFirstScan',
         href: '/analyze',
       },
       {
         when: latestScore !== null && latestScore < 70,
-        action: `Your latest score is ${latestScore}/100 — apply the top fixes to push it above 70.`,
+        key: 'improveScore',
+        params: { score: latestScore },
         href: '/analyze',
       },
       {
         when: savedJobs.length === 0,
-        action: 'Check Opportunity Radar for jobs you qualify for right now.',
+        key: 'checkRadar',
         href: '/radar',
       },
       {
         when: (profile.vault || []).length === 0,
-        action: 'Do the AI Achievement Interview to capture real metrics for your Career Vault.',
+        key: 'achievementInterview',
         href: '/profile?tab=vault',
       },
       {
         when: !profile.roadmap?.generatedAt,
-        action: 'Generate your Career GPS — a personalized 30/90-day roadmap toward your target role.',
+        key: 'generateRoadmap',
         href: '/profile?tab=roadmap',
       },
       {
         when: (profile.targetRoles || []).length === 0,
-        action: 'Set your target roles so matching and recommendations get sharper.',
+        key: 'setTargetRoles',
         href: '/profile?tab=goals',
       },
     ];
 
     const match = rules.find((r) => r.when);
-    res.json(
-      match || {
-        action: "You're in great shape — check Opportunity Radar for new matches that came in today.",
-        href: '/radar',
-      }
-    );
+    if (match) {
+      res.json({ key: match.key, params: match.params || {}, href: match.href });
+    } else {
+      res.json({ key: 'greatShape', params: {}, href: '/radar' });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
