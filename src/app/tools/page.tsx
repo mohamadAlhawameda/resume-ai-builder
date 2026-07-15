@@ -17,6 +17,8 @@ import {
   Reply,
   MailCheck,
   Type,
+  UserPlus,
+  HandHeart,
 } from 'lucide-react';
 import clsx from 'clsx';
 import Card from '@/components/ui/Card';
@@ -37,6 +39,8 @@ type Tool =
   | 'recruiter-message'
   | 'follow-up-email'
   | 'thank-you-email'
+  | 'connection-request'
+  | 'referral-request'
   | 'bio';
 
 interface ToolFields {
@@ -88,6 +92,20 @@ const TOOLS: {
     icon: MailCheck,
     descKey: 'toolsPage.toolThankYouDesc',
     fields: { job: true, recipient: true, tone: true },
+  },
+  {
+    id: 'connection-request',
+    labelKey: 'toolsPage.toolConnectionRequestLabel',
+    icon: UserPlus,
+    descKey: 'toolsPage.toolConnectionRequestDesc',
+    fields: { job: true, recipient: true, tone: true },
+  },
+  {
+    id: 'referral-request',
+    labelKey: 'toolsPage.toolReferralRequestLabel',
+    icon: HandHeart,
+    descKey: 'toolsPage.toolReferralRequestDesc',
+    fields: { job: true, jd: true, recipient: true, tone: true },
   },
   {
     id: 'linkedin-summary',
@@ -154,6 +172,8 @@ function ToolsContent() {
         setJobTitle(parsed.jobTitle || '');
         setCompany(parsed.company || '');
         setJobDescription(parsed.jobDescription || '');
+        // Set when arriving from a Networking contact's message buttons.
+        setRecipientName(parsed.recipientName || '');
         const requested = searchParams.get('tool') as Tool | null;
         if (!requested || !TOOLS.some((tl) => tl.id === requested)) setTool('cover-letter');
       } catch {
@@ -239,8 +259,8 @@ function ToolsContent() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('toolsPage.title')}</h1>
-        <p className="text-slate-500 mt-1 text-sm sm:text-base">{t('toolsPage.subtitle')}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('toolsPage.title')}</h1>
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">{t('toolsPage.subtitle')}</p>
       </div>
 
       {resumes.length === 0 ? (
@@ -267,15 +287,15 @@ function ToolsContent() {
                   setQuestions([]);
                 }}
                 className={clsx(
-                  'text-left p-4 rounded-2xl border transition-all duration-150',
+                  'text-start p-4 min-h-11 rounded-2xl border transition-all duration-150',
                   tool === id
-                    ? 'border-blue-500 bg-blue-50/60 shadow-sm ring-1 ring-blue-500'
-                    : 'border-slate-200 bg-white hover:border-blue-300'
+                    ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary'
+                    : 'border-border bg-surface hover:border-primary/50'
                 )}
               >
-                <Icon className={clsx('w-5 h-5 mb-2', tool === id ? 'text-blue-600' : 'text-slate-400')} aria-hidden />
-                <p className="font-semibold text-sm text-slate-900">{t(labelKey)}</p>
-                <p className="text-xs text-slate-500 mt-1">{t(descKey)}</p>
+                <Icon className={clsx('w-5 h-5 mb-2', tool === id ? 'text-primary' : 'text-muted-foreground')} aria-hidden />
+                <p className="font-semibold text-sm text-foreground">{t(labelKey)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t(descKey)}</p>
               </button>
             ))}
           </div>
@@ -283,17 +303,17 @@ function ToolsContent() {
           <div className="grid lg:grid-cols-2 gap-6 items-start">
             {/* Inputs */}
             <Card className="space-y-4">
-              <h2 className="font-semibold text-slate-900">{t('toolsPage.detailsSuffix', { tool: t(activeTool.labelKey) })}</h2>
+              <h2 className="font-semibold text-foreground">{t('toolsPage.detailsSuffix', { tool: t(activeTool.labelKey) })}</h2>
 
               <div>
-                <label htmlFor="tool-resume" className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="tool-resume" className="block text-sm font-medium text-foreground mb-1.5">
                   {t('toolsPage.baseResume')}
                 </label>
                 <select
                   id="tool-resume"
                   value={selectedResume}
                   onChange={(e) => setSelectedResume(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {resumes.map((r) => (
                     <option key={r._id} value={r._id}>
@@ -306,7 +326,7 @@ function ToolsContent() {
               {activeTool.fields.job && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="cl-title" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label htmlFor="cl-title" className="block text-sm font-medium text-foreground mb-1.5">
                       {t('toolsPage.jobTitleLabel')}
                     </label>
                     <input
@@ -314,11 +334,11 @@ function ToolsContent() {
                       value={jobTitle}
                       onChange={(e) => setJobTitle(e.target.value)}
                       placeholder={t('toolsPage.jobTitlePlaceholder')}
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div>
-                    <label htmlFor="cl-company" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label htmlFor="cl-company" className="block text-sm font-medium text-foreground mb-1.5">
                       {t('toolsPage.companyLabel')}
                     </label>
                     <input
@@ -326,7 +346,7 @@ function ToolsContent() {
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
                       placeholder={t('toolsPage.companyPlaceholder')}
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -334,23 +354,23 @@ function ToolsContent() {
 
               {activeTool.fields.recipient && (
                 <div>
-                  <label htmlFor="recipient" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    {t('toolsPage.recipientLabel')} <span className="text-slate-400 font-normal">{t('toolsPage.optional')}</span>
+                  <label htmlFor="recipient" className="block text-sm font-medium text-foreground mb-1.5">
+                    {t('toolsPage.recipientLabel')} <span className="text-muted-foreground font-normal">{t('toolsPage.optional')}</span>
                   </label>
                   <input
                     id="recipient"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
                     placeholder={t('toolsPage.recipientPlaceholder')}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
 
               {activeTool.fields.jd && (
                 <div>
-                  <label htmlFor="cl-jd" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    {t('toolsPage.jdLabel')} <span className="text-slate-400 font-normal">{t('toolsPage.recommended')}</span>
+                  <label htmlFor="cl-jd" className="block text-sm font-medium text-foreground mb-1.5">
+                    {t('toolsPage.jdLabel')} <span className="text-muted-foreground font-normal">{t('toolsPage.recommended')}</span>
                   </label>
                   <textarea
                     id="cl-jd"
@@ -358,36 +378,36 @@ function ToolsContent() {
                     value={jobDescription}
                     onChange={(e) => setJobDescription(e.target.value)}
                     placeholder={t('toolsPage.jdPlaceholder')}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                    className="w-full px-3 py-2.5 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                   />
                 </div>
               )}
 
               {activeTool.fields.targetRole && (
                 <div>
-                  <label htmlFor="li-role" className="block text-sm font-medium text-slate-700 mb-1.5">
-                    {t('toolsPage.targetRoleLabel')} <span className="text-slate-400 font-normal">{t('toolsPage.optional')}</span>
+                  <label htmlFor="li-role" className="block text-sm font-medium text-foreground mb-1.5">
+                    {t('toolsPage.targetRoleLabel')} <span className="text-muted-foreground font-normal">{t('toolsPage.optional')}</span>
                   </label>
                   <input
                     id="li-role"
                     value={targetRole}
                     onChange={(e) => setTargetRole(e.target.value)}
                     placeholder={t('toolsPage.targetRolePlaceholder')}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
 
               {activeTool.fields.tone && (
                 <div>
-                  <label htmlFor="tool-tone" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label htmlFor="tool-tone" className="block text-sm font-medium text-foreground mb-1.5">
                     {t('toolsPage.toneLabel')}
                   </label>
                   <select
                     id="tool-tone"
                     value={tone}
                     onChange={(e) => setTone(e.target.value as typeof tone)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="professional">{t('toolsPage.toneProfessional')}</option>
                     <option value="confident">{t('toolsPage.toneConfident')}</option>
@@ -404,7 +424,7 @@ function ToolsContent() {
             {/* Output */}
             <Card className="min-h-[300px] flex flex-col">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-slate-900">{t('toolsPage.result')}</h2>
+                <h2 className="font-semibold text-foreground">{t('toolsPage.result')}</h2>
                 {output && (
                   <div className="flex gap-1.5">
                     <Button size="sm" variant="ghost" icon={<Copy className="w-3.5 h-3.5" />} onClick={copyOutput}>
@@ -427,18 +447,18 @@ function ToolsContent() {
               ) : output ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col">
                   {!aiUsed && (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                    <p className="text-xs text-warning bg-warning/10 border border-warning/25 rounded-lg px-3 py-2 mb-3">
                       {questions.length > 0
                         ? t('toolsPage.aiNotConfiguredQuestions')
                         : t('toolsPage.aiNotConfiguredTemplate')}
                     </p>
                   )}
                   {questions.length > 0 ? (
-                    <div className="space-y-3 max-h-[60vh] overflow-y-auto thin-scrollbar pr-1">
+                    <div className="space-y-3 max-h-[60vh] overflow-y-auto thin-scrollbar pe-1">
                       {questions.map((q, i) => (
-                        <div key={i} className="border border-slate-200 rounded-xl p-4">
+                        <div key={i} className="border border-border rounded-xl p-4">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium text-slate-900">
+                            <p className="text-sm font-medium text-foreground">
                               {i + 1}. {q.question}
                             </p>
                             <Badge
@@ -449,8 +469,8 @@ function ToolsContent() {
                             </Badge>
                           </div>
                           {q.starHint && (
-                            <p className="text-xs text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                              <span className="font-semibold text-slate-700">{t('toolsPage.howToPrepare')}</span>
+                            <p className="text-xs text-muted-foreground mt-2 bg-muted border border-border rounded-lg px-3 py-2">
+                              <span className="font-semibold text-foreground">{t('toolsPage.howToPrepare')}</span>
                               {q.starHint}
                             </p>
                           )}
@@ -464,15 +484,15 @@ function ToolsContent() {
                         onChange={(e) => setOutput(e.target.value)}
                         rows={14}
                         aria-label={t('toolsPage.generatedTextAria')}
-                        className="flex-1 w-full text-sm text-slate-800 leading-relaxed border border-slate-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                        className="flex-1 w-full text-sm text-foreground leading-relaxed border border-border rounded-xl bg-surface p-4 focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                       />
-                      <p className="text-xs text-slate-400 mt-2">{t('toolsPage.editFreely')}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{t('toolsPage.editFreely')}</p>
                     </>
                   )}
                 </motion.div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-center">
-                  <p className="text-sm text-slate-400 max-w-xs">{t('toolsPage.fillDetailsPrompt')}</p>
+                  <p className="text-sm text-muted-foreground max-w-xs">{t('toolsPage.fillDetailsPrompt')}</p>
                 </div>
               )}
             </Card>

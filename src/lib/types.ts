@@ -415,6 +415,108 @@ export interface NextAction {
   href: string;
 }
 
+// ---------------------------------------------------------------------------
+// Networking CRM (contacts / reminders / watchlist / company intelligence)
+// ---------------------------------------------------------------------------
+
+export type ContactActivityType =
+  | 'connection-request-sent'
+  | 'message-sent'
+  | 'call'
+  | 'reply-received'
+  | 'meeting'
+  | 'other';
+
+export interface ContactActivityEntry {
+  _id: string;
+  type: ContactActivityType;
+  note: string;
+  date: string;
+}
+
+export interface Contact {
+  _id: string;
+  name: string;
+  role: string;
+  company: string;
+  email: string;
+  linkedinUrl: string;
+  careerPageUrl: string;
+  notes: string;
+  contacted: boolean;
+  lastContactDate: string | null;
+  relatedJobId: string;
+  activity: ContactActivityEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReminderType = 'follow-up' | 'interview' | 'networking' | 'other';
+export type ReminderStatus = 'pending' | 'done' | 'dismissed';
+
+export interface Reminder {
+  _id: string;
+  type: ReminderType;
+  title: string;
+  dueDate: string;
+  status: ReminderStatus;
+  relatedContactId: string | null;
+  relatedJobId: string;
+  createdAt: string;
+}
+
+export interface WatchlistItem {
+  _id: string;
+  companyName: string;
+  createdAt: string;
+}
+
+export interface CompanyIntelligence {
+  company: string;
+  openRoles: Job[];
+  openRoleCount: number;
+  hiringLocations: string[];
+  topSkills: { skill: string; count: number }[];
+  contacts: Contact[];
+  networkingActivity: {
+    contactId: string;
+    contactName: string;
+    type: ContactActivityType;
+    note: string;
+    date: string;
+  }[];
+  applications: SavedJob[];
+  watching: boolean;
+  watchlistId: string | null;
+}
+
+export interface CompanyBrief {
+  aiUsed: boolean;
+  overview: string;
+  interviewPrep: string[];
+  questionsToAsk: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Engagement (streak / checklist / calendar / weekly report / readiness)
+// ---------------------------------------------------------------------------
+
+export interface EngagementSummary {
+  streak: number;
+  activeToday: boolean;
+  calendar: { date: string; count: number }[];
+  checklist: { key: string; done: boolean }[];
+  weekly: {
+    thisWeek: { scans: number; saved: number; applications: number; outreach: number };
+    lastWeek: { scans: number; saved: number; applications: number; outreach: number };
+  };
+  readiness: {
+    score: number;
+    parts: { key: string; score: number; weight: number; tipKey: string }[];
+  };
+  overdueReminders: number;
+}
+
 /** Sub-scores shown in the Qualification Evidence Map. */
 export interface JobSubScores {
   skills?: number;

@@ -24,12 +24,12 @@ export default function StepNavigation({ steps, currentStep, onStepChange }: Ste
             onClick={() => onStepChange(i)}
             aria-current={active ? 'step' : undefined}
             className={clsx(
-              'inline-flex items-center gap-1.5 px-4 py-2 rounded-full transition-all duration-200 text-sm font-medium whitespace-nowrap',
+              'inline-flex items-center gap-1.5 px-4 py-2 min-h-11 rounded-full transition-all duration-200 text-sm font-medium whitespace-nowrap',
               active
-                ? 'bg-blue-600 text-white shadow-md'
+                ? 'bg-primary text-primary-foreground shadow-md'
                 : done
-                ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                ? 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20'
+                : 'bg-surface text-muted-foreground border border-border hover:border-primary/50 hover:text-primary'
             )}
           >
             {done ? (
@@ -38,7 +38,7 @@ export default function StepNavigation({ steps, currentStep, onStepChange }: Ste
               <span
                 className={clsx(
                   'w-4.5 h-4.5 rounded-full text-[10px] font-bold flex items-center justify-center',
-                  active ? 'bg-white/20' : 'bg-slate-100 text-slate-500'
+                  active ? 'bg-white/20' : 'bg-muted text-muted-foreground'
                 )}
               >
                 {i + 1}

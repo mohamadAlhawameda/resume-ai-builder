@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Providers from "@/components/Providers";
+import CommandPalette from "@/components/CommandPalette";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
@@ -66,6 +67,7 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <CommandPalette />
           <Providers />
         </LocaleProvider>
       </body>

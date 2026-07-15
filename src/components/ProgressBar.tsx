@@ -15,9 +15,9 @@ export default function ProgressBar({ step, totalSteps }: ProgressBarProps) {
 
   return (
     <div className="w-full mb-5">
-      <div className="w-full bg-slate-200 rounded-full h-1.5">
+      <div className="w-full bg-muted rounded-full h-1.5">
         <div
-          className="bg-blue-600 h-1.5 rounded-full transition-all duration-500 ease-out"
+          className="bg-primary h-1.5 rounded-full transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
           role="progressbar"
           aria-valuemin={0}
@@ -26,7 +26,7 @@ export default function ProgressBar({ step, totalSteps }: ProgressBarProps) {
           aria-label={label}
         />
       </div>
-      <p className="text-right text-xs text-slate-400 mt-1.5">{label}</p>
+      <p className="text-end text-xs text-muted-foreground mt-1.5">{label}</p>
     </div>
   );
 }

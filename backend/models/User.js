@@ -38,6 +38,29 @@ const JobPreferencesSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Dashboard sidebar widget keys — kept in sync with WIDGET_REGISTRY in
+// src/app/dashboard/widgets.ts on the frontend. Only the sidebar column is
+// customizable; the main column (resumes/score progress/week) stays fixed.
+const DASHBOARD_WIDGET_KEYS = [
+  'careerTarget',
+  'dailyChecklist',
+  'interviewReadiness',
+  'careerProgress',
+  'recommendations',
+  'missingSkills',
+  'topJobMatches',
+  'recentAchievements',
+  'upcomingTasks',
+];
+
+const DashboardLayoutSchema = new mongoose.Schema(
+  {
+    sidebarOrder: { type: [String], enum: DASHBOARD_WIDGET_KEYS, default: () => [...DASHBOARD_WIDGET_KEYS] },
+    hiddenWidgets: { type: [String], enum: DASHBOARD_WIDGET_KEYS, default: [] },
+  },
+  { _id: false }
+);
+
 const UserSchema = new mongoose.Schema(
   {
     name: {
@@ -75,10 +98,19 @@ const UserSchema = new mongoose.Schema(
     // Personalization used for recommendations and job matching
     targetRole: { type: String, default: '', trim: true, maxlength: 120 },
     industry: { type: String, default: '', trim: true, maxlength: 120 },
+    // Where the user is in their career — tailors onboarding copy and
+    // recommendations. Empty string = not asked yet.
+    careerStage: {
+      type: String,
+      enum: ['', 'student', 'new-grad', 'career-changer', 'experienced'],
+      default: '',
+    },
     jobPreferences: { type: JobPreferencesSchema, default: () => ({}) },
+    dashboardLayout: { type: DashboardLayoutSchema, default: () => ({}) },
   },
   { timestamps: true }
 );
 
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 export default User;
+export { DASHBOARD_WIDGET_KEYS };

@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import { OAuth2Client } from 'google-auth-library';
-import User from '../models/User.js';
+import User, { DASHBOARD_WIDGET_KEYS } from '../models/User.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { validateBody, jobPreferencesSchema } from '../utils/validate.js';
 import { sendWelcomeEmail } from '../services/email.js';
@@ -160,7 +160,9 @@ router.get('/me', authMiddleware, async (req, res) => {
         email: user.email,
         targetRole: user.targetRole || '',
         industry: user.industry || '',
+        careerStage: user.careerStage || '',
         jobPreferences: user.jobPreferences || {},
+        dashboardLayout: user.dashboardLayout || {},
       },
     });
   } catch (err) {
@@ -169,10 +171,17 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+const dashboardLayoutSchema = Joi.object({
+  sidebarOrder: Joi.array().items(Joi.string().valid(...DASHBOARD_WIDGET_KEYS)),
+  hiddenWidgets: Joi.array().items(Joi.string().valid(...DASHBOARD_WIDGET_KEYS)),
+});
+
 const profileSchema = Joi.object({
   targetRole: Joi.string().allow('').max(120),
   industry: Joi.string().allow('').max(120),
+  careerStage: Joi.string().valid('', 'student', 'new-grad', 'career-changer', 'experienced'),
   jobPreferences: jobPreferencesSchema,
+  dashboardLayout: dashboardLayoutSchema,
 });
 
 router.put('/profile', authMiddleware, validateBody(profileSchema), async (req, res) => {
@@ -180,7 +189,14 @@ router.put('/profile', authMiddleware, validateBody(profileSchema), async (req, 
     const update = {};
     if (req.body.targetRole !== undefined) update.targetRole = req.body.targetRole;
     if (req.body.industry !== undefined) update.industry = req.body.industry;
+    if (req.body.careerStage !== undefined) update.careerStage = req.body.careerStage;
     if (req.body.jobPreferences !== undefined) update.jobPreferences = req.body.jobPreferences;
+    if (req.body.dashboardLayout !== undefined) {
+      // Partial update: merge onto the existing layout so, e.g., toggling one
+      // widget's visibility doesn't require resending the whole order array.
+      const current = (await User.findById(req.user.userId).select('dashboardLayout'))?.dashboardLayout || {};
+      update.dashboardLayout = { ...current.toObject?.() ?? current, ...req.body.dashboardLayout };
+    }
 
     const user = await User.findByIdAndUpdate(req.user.userId, update, { new: true });
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -191,7 +207,9 @@ router.put('/profile', authMiddleware, validateBody(profileSchema), async (req, 
         email: user.email,
         targetRole: user.targetRole,
         industry: user.industry,
+        careerStage: user.careerStage,
         jobPreferences: user.jobPreferences,
+        dashboardLayout: user.dashboardLayout,
       },
     });
   } catch (err) {

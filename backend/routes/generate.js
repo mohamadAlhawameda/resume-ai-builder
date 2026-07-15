@@ -29,7 +29,8 @@ const baseSchema = Joi.object({
   type: Joi.string()
     .valid(
       'summary', 'bullets', 'skills', 'achievements', 'cover-letter', 'linkedin-summary', 'bio', 'tailor-bullets',
-      'interview-prep', 'linkedin-headline', 'recruiter-message', 'follow-up-email', 'thank-you-email'
+      'interview-prep', 'linkedin-headline', 'recruiter-message', 'follow-up-email', 'thank-you-email',
+      'connection-request', 'referral-request'
     )
     .required(),
   data: resumeDataSchema.required(),
@@ -123,6 +124,15 @@ function fallbackFor(type, body) {
     case 'thank-you-email':
       return {
         text: `Subject: Thank you — ${jobTitle || role} interview\n\nHi ${body.recipientName || '[Name]'},\n\nThank you for taking the time to speak with me about the ${jobTitle || role} position${company ? ` at ${company}` : ''}. Our conversation reinforced my enthusiasm for the role.\n\n[Add one sentence referencing something specific you discussed.]\n\nI'm excited about the possibility of contributing, and I'm happy to answer any further questions.\n\nBest regards,\n${data.fullName || '[Your name]'}`,
+      };
+    case 'connection-request':
+      // LinkedIn caps connection notes at 300 characters — keep it short.
+      return {
+        text: `Hi ${body.recipientName || '[Name]'}, I'm a ${role}${skills ? ` with a background in ${skills.split(', ').slice(0, 2).join(' and ')}` : ''}${company ? ` and I'm very interested in ${company}` : ''}. I'd love to connect and learn more about your team's work.`,
+      };
+    case 'referral-request':
+      return {
+        text: `Hi ${body.recipientName || '[Name]'},\n\nI hope you're doing well. I'm applying for the ${jobTitle || role} position${company ? ` at ${company}` : ''} and my background${skills ? ` in ${skills}` : ''} lines up closely with what the role calls for.\n\nWould you be comfortable referring me, or pointing me to the right person? I'm happy to send over my resume and a short summary you could forward — and of course, no worries at all if it's not a good fit.\n\nThanks so much,\n${data.fullName || '[Your name]'}`,
       };
     default:
       return { suggestions: [] };
@@ -296,6 +306,28 @@ router.post('/', validateBody(baseSchema), async (req, res) => {
             'Write a post-interview thank-you email (90–140 words) with a subject line on the first line ("Subject: ..."). Warm but professional: thank them, reinforce fit with one real strength from the resume, and leave a placeholder like [something specific you discussed] for the personal touch — never fabricate interview details. Plain text.',
           user: `Recipient: ${body.recipientName || 'the interviewer'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}`,
           maxTokens: 350,
+          language,
+        });
+        return res.json({ text, aiUsed: true });
+      }
+
+      case 'connection-request': {
+        const text = await chatText({
+          system:
+            'Write a LinkedIn connection request note (STRICTLY under 300 characters — LinkedIn\'s hard limit). Warm, specific, professional; say who the sender is and why they want to connect. Ground it only in the resume provided — never invent experience. Plain text, no quotes around it, no subject line.',
+          user: `Recipient: ${body.recipientName || 'a recruiter'}\nRecipient's company: ${body.company || 'not specified'}\nRole of interest: ${body.jobTitle || body.targetRole || 'not specified'}\nTone: ${body.tone}\n\nResume:\n${resumeText}`,
+          maxTokens: 150,
+          language,
+        });
+        return res.json({ text: text.slice(0, 300), aiUsed: true });
+      }
+
+      case 'referral-request': {
+        const text = await chatText({
+          system:
+            'Write a referral request message (100–150 words) from a candidate to someone who works at the target company. Respectful of their time, easy to say no to, and specific about the role. Offer to send a resume/summary they can forward. Reference only real experience from the resume — never invent qualifications. Plain text, no markdown, no subject line.',
+          user: `Recipient: ${body.recipientName || 'a contact at the company'}\nJob title: ${body.jobTitle || 'not specified'}\nCompany: ${body.company || 'not specified'}\nTone: ${body.tone}\n\nJob description:\n${jd || 'not provided'}\n\nResume:\n${resumeText}`,
+          maxTokens: 400,
           language,
         });
         return res.json({ text, aiUsed: true });

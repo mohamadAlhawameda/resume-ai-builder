@@ -28,6 +28,7 @@ import Button from './ui/Button';
 import Modal from './ui/Modal';
 import { api, ApiError, apiErrorMessage } from '@/lib/api';
 import { getToken, isLoggedIn } from '@/lib/auth';
+import useAuthStatus from '@/app/hooks/useAuthStatus';
 import { exportElementToPDF, exportToDocx } from '@/lib/exportResume';
 import {
   emptyResumeData,
@@ -44,6 +45,11 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const router = useRouter();
   const { t } = useLocale();
+  // isLoggedIn() reads localStorage, which doesn't exist during SSR — using
+  // it directly in rendered text causes a hydration mismatch (server always
+  // renders the logged-out copy). useAuthStatus() defaults to false on first
+  // render (matching SSR) and updates after mount, same as Navbar does.
+  const authed = useAuthStatus();
   const STEPS = [
     t('builderPage.stepContact'),
     t('builderPage.stepExperience'),
@@ -432,15 +438,15 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
 
   const saveIndicator =
     saveState === 'saving' ? (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('builderPage.savingIndicator')}
       </span>
     ) : saveState === 'saved' ? (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
         <Check className="w-3.5 h-3.5" /> {t('builderPage.savedIndicator')}
       </span>
     ) : saveState === 'error' ? (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500">{t('builderPage.autosaveFailed')}</span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-danger">{t('builderPage.autosaveFailed')}</span>
     ) : null;
 
   return (
@@ -448,11 +454,11 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             {mode === 'edit' ? t('builderPage.editTitle') : t('builderPage.createTitle')}
           </h1>
           <div className="flex items-center gap-3 mt-1 min-h-[18px]">
-            <p className="text-sm text-slate-500">{t('builderPage.autosaveNotice')}</p>
+            <p className="text-sm text-muted-foreground">{t('builderPage.autosaveNotice')}</p>
             {saveIndicator}
           </div>
         </div>
@@ -462,7 +468,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             size="sm"
             icon={showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             onClick={() => setShowPreview((v) => !v)}
-            className="xl:hidden"
+            className="lg:hidden"
           >
             {showPreview ? t('builderPage.hidePreview') : t('builderPage.previewButton')}
           </Button>
@@ -490,12 +496,12 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
             loading={saving}
             onClick={handleSaveResume}
           >
-            {isLoggedIn() ? t('builderPage.saveButton') : t('builderPage.saveLoginButton')}
+            {authed ? t('builderPage.saveButton') : t('builderPage.saveLoginButton')}
           </Button>
         </div>
       </div>
 
-      <div className="grid xl:grid-cols-2 gap-8 items-start">
+      <div className="grid lg:grid-cols-2 gap-8 items-start">
         {/* ---------- Form column ---------- */}
         <div>
           <ProgressBar step={step} totalSteps={STEPS.length} />
@@ -580,18 +586,18 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
                 )}
 
                 {step === 4 && (
-                  <section className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-8">
+                  <section className="bg-surface p-6 sm:p-8 rounded-2xl shadow-soft border border-border space-y-8">
                     <div>
-                      <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2 mb-1">
-                        <Settings2 className="w-5 h-5 text-blue-500" aria-hidden /> {t('builderPage.customizeFinishTitle')}
+                      <h2 className="text-xl font-semibold text-foreground flex items-center gap-2 mb-1">
+                        <Settings2 className="w-5 h-5 text-primary" aria-hidden /> {t('builderPage.customizeFinishTitle')}
                       </h2>
-                      <p className="text-sm text-slate-500">{t('builderPage.customizeFinishDesc')}</p>
+                      <p className="text-sm text-muted-foreground">{t('builderPage.customizeFinishDesc')}</p>
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="resumeTitle" className="block text-sm font-medium text-slate-700 mb-1.5">
-                          {t('builderPage.resumeNameLabel')} <span className="text-red-500">*</span>
+                        <label htmlFor="resumeTitle" className="block text-sm font-medium text-foreground mb-1.5">
+                          {t('builderPage.resumeNameLabel')} <span className="text-danger">*</span>
                         </label>
                         <input
                           id="resumeTitle"
@@ -599,26 +605,26 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
                           value={formData.title || ''}
                           onChange={(e) => setFormData((old) => ({ ...old, title: e.target.value }))}
                           placeholder={t('builderPage.resumeNamePlaceholder')}
-                          className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3.5 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                         />
-                        <p className="mt-1 text-xs text-slate-500">{t('builderPage.resumeNameHelper')}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{t('builderPage.resumeNameHelper')}</p>
                       </div>
                       <div>
-                        <label htmlFor="builderTargetRole" className="block text-sm font-medium text-slate-700 mb-1.5">
-                          {t('builderPage.targetRoleLabel')} <span className="text-slate-400 font-normal">{t('builderPage.targetRoleOptional')}</span>
+                        <label htmlFor="builderTargetRole" className="block text-sm font-medium text-foreground mb-1.5">
+                          {t('builderPage.targetRoleLabel')} <span className="text-muted-foreground font-normal">{t('builderPage.targetRoleOptional')}</span>
                         </label>
                         <input
                           id="builderTargetRole"
                           value={formData.targetRole || ''}
                           onChange={(e) => setFormData((old) => ({ ...old, targetRole: e.target.value }))}
                           placeholder={t('builderPage.targetRolePlaceholder')}
-                          className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3.5 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-900 mb-2.5">{t('builderPage.templateLabel')}</h3>
+                      <h3 className="text-sm font-semibold text-foreground mb-2.5">{t('builderPage.templateLabel')}</h3>
                       <TemplateSelector template={template} setTemplate={(v) => setTemplate(v as TemplateId)} />
                     </div>
 
@@ -631,7 +637,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
                       onCustomizationChange={setCustomization}
                     />
 
-                    <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-slate-100">
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-border">
                       <Button icon={<FileDown className="w-4 h-4" />} loading={exporting === 'pdf'} onClick={handleExportPDF} variant="secondary">
                         {t('builderPage.exportPdfButton')}
                       </Button>
@@ -639,7 +645,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
                         {t('builderPage.exportDocxButton')}
                       </Button>
                       <Button icon={<CloudUpload className="w-4 h-4" />} loading={saving} onClick={handleSaveResume} variant="success">
-                        {isLoggedIn() ? t('builderPage.saveToAccountButton') : t('builderPage.loginSaveButton')}
+                        {authed ? t('builderPage.saveToAccountButton') : t('builderPage.loginSaveButton')}
                       </Button>
                     </div>
                   </section>
@@ -660,11 +666,17 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
         </div>
 
         {/* ---------- Live preview column ---------- */}
-        <div className={`${showPreview ? 'block' : 'hidden'} xl:block`}>
-          <div className="xl:sticky xl:top-20">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">{t('builderPage.livePreviewLabel')}</p>
-            <div className="bg-slate-200/60 rounded-2xl p-3 sm:p-5 overflow-auto thin-scrollbar max-h-[80vh] border border-slate-200">
-              <div className="origin-top-left scale-[0.45] sm:scale-[0.6] lg:scale-[0.7] w-[222%] sm:w-[166%] lg:w-[142%]">
+        <div className={`${showPreview ? 'block' : 'hidden'} lg:block`}>
+          <div className="lg:sticky lg:top-20">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{t('builderPage.livePreviewLabel')}</p>
+            <div className="bg-muted rounded-2xl p-3 sm:p-5 overflow-auto thin-scrollbar max-h-[80vh] border border-border">
+              {/* Scale steps roughly track how much width this column actually
+                  has: full viewport width while stacked below the form
+                  (<lg), then half the container once side-by-side kicks in
+                  at lg — which is deliberately lg, not xl, so ~1024px+
+                  laptop/tablet-landscape widths get the real side-by-side
+                  layout instead of a toggled, heavily-shrunk preview. */}
+              <div className="origin-top-left scale-[0.45] sm:scale-[0.6] lg:scale-[0.55] xl:scale-[0.7] w-[222%] sm:w-[166%] lg:w-[182%] xl:w-[143%]">
                 <div className="shadow-2xl">
                   <ResumePreview data={formData} template={template} />
                 </div>
@@ -686,7 +698,7 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
       {/* Every resume needs a clear, distinct name before it can be saved. */}
       <Modal open={nameModalOpen} onClose={() => setNameModalOpen(false)} title={t('builderPage.nameModalTitle')} size="sm">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">{t('builderPage.nameModalDesc')}</p>
+          <p className="text-sm text-muted-foreground">{t('builderPage.nameModalDesc')}</p>
           <div>
             <label htmlFor="resumeNameModal" className="sr-only">
               {t('builderPage.resumeNameSrLabel')}
@@ -707,11 +719,11 @@ export default function ResumeBuilderLayout({ mode = 'create' }: { mode?: 'creat
                 }
               }}
               placeholder={t('builderPage.resumeNamePlaceholder')}
-              className={`w-full px-3.5 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 ${
-                nameError ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-blue-500'
+              className={`w-full px-3.5 py-2.5 min-h-11 text-sm border rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 ${
+                nameError ? 'border-danger focus:ring-danger' : 'border-border-strong focus:ring-primary'
               }`}
             />
-            {nameError && <p className="text-red-600 text-xs mt-1.5 font-medium">{nameError}</p>}
+            {nameError && <p className="text-danger text-xs mt-1.5 font-medium">{nameError}</p>}
           </div>
           <Button fullWidth loading={saving} onClick={confirmNameAndSave}>
             {t('builderPage.saveResumeButton')}

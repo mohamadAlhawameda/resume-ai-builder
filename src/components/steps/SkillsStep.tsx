@@ -55,7 +55,7 @@ export default function SkillsStep({
                 >
                   {(provided) => (
                     <div
-                      className="relative bg-white border rounded-lg p-5 shadow hover:shadow-md transition"
+                      className="relative bg-surface border border-border rounded-lg p-5 shadow-soft hover:shadow-soft-lg transition"
                       ref={provided.innerRef}
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
@@ -67,7 +67,7 @@ export default function SkillsStep({
                           e.stopPropagation();
                           removeItem(index);
                         }}
-                        className="absolute -top-3 -right-3 z-10 bg-white border border-red-300 text-red-600 text-xs px-2 py-0.5 rounded-full shadow hover:bg-red-50 hover:scale-105 transition"
+                        className="absolute -top-3 -end-3 z-10 bg-surface border border-danger/30 text-danger text-xs w-7 h-7 flex items-center justify-center rounded-full shadow hover:bg-danger/10 hover:scale-105 transition"
                       >
                         ✕
                       </button>
@@ -91,7 +91,7 @@ export default function SkillsStep({
       <div className="flex flex-wrap items-center gap-4 mt-6">
         <button
           onClick={addItem}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+          className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition"
         >
           {t('builderPage.addSkillButton')}
         </button>
@@ -100,10 +100,10 @@ export default function SkillsStep({
           <button
             onClick={getSkillSuggestions}
             disabled={aiLoading}
-            className={`inline-flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-md transition ${
+            className={`inline-flex items-center gap-1 text-sm font-medium px-3 py-2 min-h-11 rounded-lg transition ${
               aiLoading
-                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-accent/10 text-accent hover:bg-accent/20'
             }`}
           >
             <Sparkles className="w-4 h-4" />
@@ -119,7 +119,7 @@ export default function SkillsStep({
               key={i}
               type="button"
               onClick={() => onChange(skills.length, skill)}
-              className="bg-gray-100 hover:bg-blue-100 text-sm text-gray-700 border border-gray-300 rounded-full px-4 py-1 transition cursor-pointer shadow-sm hover:shadow"
+              className="bg-muted hover:bg-primary/10 text-sm text-foreground border border-border-strong rounded-full px-4 py-1 min-h-11 transition cursor-pointer shadow-sm hover:shadow"
             >
               {skill}
             </button>

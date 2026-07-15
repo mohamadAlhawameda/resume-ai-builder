@@ -31,10 +31,10 @@ export default function TemplateSelector({ template, setTemplate }: TemplateSele
           title={t(tpl.hintKey)}
           onClick={() => setTemplate(tpl.id)}
           className={clsx(
-            'px-3.5 py-2 rounded-xl text-sm font-medium border transition-all duration-150',
+            'px-3.5 py-2 min-h-11 rounded-xl text-sm font-medium border transition-all duration-150',
             template === tpl.id
-              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-              : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'
+              ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+              : 'bg-surface text-muted-foreground border-border-strong hover:border-primary/50 hover:text-primary'
           )}
         >
           {t(tpl.labelKey)}

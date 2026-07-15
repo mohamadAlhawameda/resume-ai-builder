@@ -17,7 +17,12 @@ import generateRoutes from './routes/generate.js';
 import jobsRoutes from './routes/jobs.js';
 import notificationRoutes from './routes/notifications.js';
 import profileRoutes from './routes/profile.js';
+import contactsRoutes from './routes/contacts.js';
+import remindersRoutes from './routes/reminders.js';
+import companiesRoutes from './routes/companies.js';
+import engagementRoutes from './routes/engagement.js';
 import { usingSampleData, startBackgroundJobRefresh } from './providers/jobs/index.js';
+import { startScheduledChecks } from './services/scheduledChecks.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +64,10 @@ app.use('/generate', generateRoutes);
 app.use('/jobs', jobsRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/profile', profileRoutes);
+app.use('/contacts', contactsRoutes);
+app.use('/reminders', remindersRoutes);
+app.use('/companies', companiesRoutes);
+app.use('/engagement', engagementRoutes);
 
 // Central error handler — malformed JSON, oversized payloads, etc.
 app.use((err, req, res, next) => {
@@ -82,6 +91,9 @@ mongoose
     // Warm the job cache now and keep refreshing it in the background so
     // user requests never pay the cost of a live multi-provider fetch.
     startBackgroundJobRefresh();
+    // Periodic reminder/watchlist sweep (in-app notifications + opted-in
+    // email alerts) — same in-process pattern as the job-cache refresh.
+    startScheduledChecks();
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
     });

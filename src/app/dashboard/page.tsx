@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -21,6 +21,7 @@ import {
   CalendarClock,
   Puzzle,
   Bell,
+  LayoutGrid,
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Badge, { scoreTone } from '@/components/ui/Badge';
@@ -29,15 +30,20 @@ import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { TrendLine } from '@/components/ui/Chart';
+import DashboardCustomizeSheet from '@/components/DashboardCustomizeSheet';
 import { api, apiErrorMessage } from '@/lib/api';
 import { getUser, isLoggedIn, type StoredUser } from '@/lib/auth';
-import type { ResumeRecord, ScanHistoryItem, SavedJob, Job, NextAction, CareerProfile } from '@/lib/types';
+import type { ResumeRecord, ScanHistoryItem, SavedJob, Job, NextAction, CareerProfile, Reminder, EngagementSummary } from '@/lib/types';
 import { useLocale } from '@/i18n/LocaleProvider';
+import { DEFAULT_SIDEBAR_ORDER, reconcileOrder, type WidgetKey } from '@/lib/dashboardWidgets';
 
 interface Profile {
   targetRole: string;
   industry: string;
+  careerStage: string;
 }
+
+const CAREER_STAGES = ['student', 'new-grad', 'career-changer', 'experienced'] as const;
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -50,11 +56,16 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
   const [topJobs, setTopJobs] = useState<Job[]>([]);
-  const [profile, setProfile] = useState<Profile>({ targetRole: '', industry: '' });
+  const [profile, setProfile] = useState<Profile>({ targetRole: '', industry: '', careerStage: '' });
+  const [engagement, setEngagement] = useState<EngagementSummary | null>(null);
   const [careerProfile, setCareerProfile] = useState<CareerProfile | null>(null);
   const [editingTarget, setEditingTarget] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
+  const [tasks, setTasks] = useState<{ due: Reminder[]; upcoming: Reminder[] } | null>(null);
+  const [sidebarOrder, setSidebarOrder] = useState<WidgetKey[]>(DEFAULT_SIDEBAR_ORDER);
+  const [hiddenWidgets, setHiddenWidgets] = useState<WidgetKey[]>([]);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -71,22 +82,37 @@ export default function DashboardPage() {
         api<ScanHistoryItem[]>('/analysis/history'),
         api<SavedJob[]>('/jobs/saved'),
         api<{ jobs: Job[] }>('/jobs/recommended'),
-        api<{ user: { targetRole: string; industry: string } }>('/auth/me'),
+        api<{
+          user: {
+            targetRole: string;
+            industry: string;
+            careerStage?: string;
+            dashboardLayout?: { sidebarOrder?: string[]; hiddenWidgets?: string[] };
+          };
+        }>('/auth/me'),
         api<NextAction>('/profile/next-action'),
         api<CareerProfile>('/profile'),
+        api<{ due: Reminder[]; upcoming: Reminder[] }>('/reminders/due'),
+        api<EngagementSummary>('/engagement/summary'),
       ]);
       if (results[0].status === 'fulfilled') setResumes(results[0].value);
       if (results[1].status === 'fulfilled') setHistory(results[1].value);
       if (results[2].status === 'fulfilled') setSavedJobs(results[2].value);
       if (results[3].status === 'fulfilled') setTopJobs((results[3].value.jobs || []).slice(0, 3));
       if (results[4].status === 'fulfilled') {
+        const u = results[4].value.user;
         setProfile({
-          targetRole: results[4].value.user.targetRole || '',
-          industry: results[4].value.user.industry || '',
+          targetRole: u.targetRole || '',
+          industry: u.industry || '',
+          careerStage: u.careerStage || '',
         });
+        setSidebarOrder(reconcileOrder(u.dashboardLayout?.sidebarOrder));
+        setHiddenWidgets((u.dashboardLayout?.hiddenWidgets || []) as WidgetKey[]);
       }
       if (results[5].status === 'fulfilled') setNextAction(results[5].value);
       if (results[6].status === 'fulfilled') setCareerProfile(results[6].value);
+      if (results[7].status === 'fulfilled') setTasks(results[7].value);
+      if (results[8].status === 'fulfilled') setEngagement(results[8].value);
       if (results[0].status === 'rejected') {
         toast.error(apiErrorMessage(results[0].reason, t('dashboardPage.toastLoadResumesError')));
       }
@@ -108,6 +134,34 @@ export default function DashboardPage() {
       setSavingProfile(false);
     }
   }, [profile, t]);
+
+  // Optimistic — the layout is a preference, not critical data, so we don't
+  // block the UI on the network round-trip. A failure just silently keeps
+  // the previous server-side layout; nothing the user sees breaks either way.
+  const persistLayout = useCallback((nextOrder: WidgetKey[], nextHidden: WidgetKey[]) => {
+    api('/auth/profile', { method: 'PUT', body: { dashboardLayout: { sidebarOrder: nextOrder, hiddenWidgets: nextHidden } } }).catch(
+      () => {}
+    );
+  }, []);
+
+  const handleOrderChange = useCallback(
+    (next: WidgetKey[]) => {
+      setSidebarOrder(next);
+      persistLayout(next, hiddenWidgets);
+    },
+    [hiddenWidgets, persistLayout]
+  );
+
+  const handleToggleHidden = useCallback(
+    (key: WidgetKey) => {
+      setHiddenWidgets((prev) => {
+        const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+        persistLayout(sidebarOrder, next);
+        return next;
+      });
+    },
+    [sidebarOrder, persistLayout]
+  );
 
   const scans = history.filter((h) => h.type === 'scan' && typeof h.overall === 'number');
   const latestScore = scans[0]?.overall ?? null;
@@ -241,10 +295,20 @@ export default function DashboardPage() {
               ? profile.industry
                 ? t('dashboardPage.workingTowardWithIndustry', { role: profile.targetRole, industry: profile.industry })
                 : t('dashboardPage.workingToward', { role: profile.targetRole })
-              : t('dashboardPage.progressAtGlance')}
+              : profile.careerStage
+                ? t(`dashboardPage.stageLine.${profile.careerStage}`)
+                : t('dashboardPage.progressAtGlance')}
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            icon={<LayoutGrid className="w-4 h-4" />}
+            variant="ghost"
+            aria-label={t('dashboardPage.customizeDashboard')}
+            onClick={() => setCustomizeOpen(true)}
+          >
+            <span className="hidden sm:inline">{t('dashboardPage.customize')}</span>
+          </Button>
           <Button icon={<ScanSearch className="w-4 h-4" />} variant="outline" onClick={() => router.push('/analyze')}>
             {t('dashboardPage.scanResume')}
           </Button>
@@ -401,209 +465,399 @@ export default function DashboardPage() {
             )}
           </Card>
 
-          {/* Your week at a glance */}
+          {/* Your week at a glance + activity calendar */}
           <div>
             <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
               <CalendarClock className="w-4 h-4 text-accent" aria-hidden /> {t('dashboardPage.yourWeek')}
             </h2>
-            <div className="grid sm:grid-cols-3 gap-4">
-              <Card>
-                <p className="text-2xl font-bold text-foreground">{weekStats.scansThisWeek}</p>
-                <p className="text-sm text-muted-foreground">{t('dashboardPage.weekScans')}</p>
-              </Card>
-              <Card>
-                <p className="text-2xl font-bold text-foreground">{weekStats.applicationsThisWeek}</p>
-                <p className="text-sm text-muted-foreground">{t('dashboardPage.weekApplications')}</p>
-              </Card>
-              <Card>
-                <p className="text-2xl font-bold text-foreground">{weekStats.savedThisWeek}</p>
-                <p className="text-sm text-muted-foreground">{t('dashboardPage.weekSaved')}</p>
-              </Card>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              {(
+                [
+                  ['scans', t('dashboardPage.weekScans')],
+                  ['applications', t('dashboardPage.weekApplications')],
+                  ['saved', t('dashboardPage.weekSaved')],
+                  ['outreach', t('dashboardPage.weekOutreach')],
+                ] as const
+              ).map(([key, label]) => {
+                const current = engagement?.weekly.thisWeek[key] ?? (key === 'scans' ? weekStats.scansThisWeek : key === 'applications' ? weekStats.applicationsThisWeek : key === 'saved' ? weekStats.savedThisWeek : 0);
+                const previous = engagement?.weekly.lastWeek[key] ?? 0;
+                const delta = current - previous;
+                return (
+                  <Card key={key}>
+                    <p className="text-2xl font-bold text-foreground">{current}</p>
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    {engagement && delta !== 0 && (
+                      <p className={`text-xs font-medium mt-0.5 ${delta > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                        {t('dashboardPage.vsLastWeek', { delta: `${delta > 0 ? '+' : ''}${delta}` })}
+                      </p>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
+
+            {/* 12-week activity heatmap — every scan, save, application,
+                outreach, or completed reminder lights up a day. */}
+            {engagement && (
+              <Card className="mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-foreground">{t('dashboardPage.activityCalendar')}</h3>
+                  <Badge tone={engagement.streak > 0 ? 'amber' : 'slate'}>
+                    🔥 {t('dashboardPage.streak', { n: engagement.streak })}
+                  </Badge>
+                </div>
+                <div
+                  role="img"
+                  aria-label={t('dashboardPage.activityCalendarAria')}
+                  className="grid grid-flow-col grid-rows-7 gap-1 overflow-x-auto pb-1"
+                >
+                  {engagement.calendar.map((day) => (
+                    <span
+                      key={day.date}
+                      title={`${day.date}: ${day.count}`}
+                      className={`w-3 h-3 rounded-[3px] ${
+                        day.count === 0
+                          ? 'bg-muted'
+                          : day.count === 1
+                            ? 'bg-primary/30'
+                            : day.count <= 3
+                              ? 'bg-primary/60'
+                              : 'bg-primary'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
         </div>
 
-        {/* Right column */}
+        {/* Right column — order/visibility controlled by sidebarOrder/hiddenWidgets */}
         <div className="space-y-6">
-          {/* Career target */}
-          <Card id="target">
-            <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-              <Target className="w-4 h-4 text-primary" aria-hidden /> {t('dashboardPage.careerTarget')}
-            </h2>
-            {editingTarget ? (
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="targetRole" className="block text-xs font-medium text-muted-foreground mb-1">
-                    {t('dashboardPage.targetRoleLabel')}
-                  </label>
-                  <input
-                    id="targetRole"
-                    value={profile.targetRole}
-                    onChange={(e) => setProfile((p) => ({ ...p, targetRole: e.target.value }))}
-                    placeholder={t('dashboardPage.targetRolePlaceholder')}
-                    className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="industry" className="block text-xs font-medium text-muted-foreground mb-1">
-                    {t('dashboardPage.industryLabel')}
-                  </label>
-                  <input
-                    id="industry"
-                    value={profile.industry}
-                    onChange={(e) => setProfile((p) => ({ ...p, industry: e.target.value }))}
-                    placeholder={t('dashboardPage.industryPlaceholder')}
-                    className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" loading={savingProfile} onClick={saveProfile}>
-                    {t('dashboardPage.save')}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditingTarget(false)}>
-                    {t('dashboardPage.cancel')}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {profile.targetRole ? (
-                  <p className="text-sm text-foreground">
-                    <span className="font-medium">{profile.targetRole}</span>
-                    {profile.industry && <span className="text-muted-foreground"> · {profile.industry}</span>}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">{t('dashboardPage.targetNotSet')}</p>
-                )}
-                <Button size="sm" variant="outline" className="mt-3" onClick={() => setEditingTarget(true)}>
-                  {profile.targetRole ? t('dashboardPage.edit') : t('dashboardPage.setTarget')}
-                </Button>
-              </div>
-            )}
-          </Card>
-
-          {/* Career progress — how close to the goal, at a glance */}
-          {careerProfile && (
-            <Card>
-              <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-                <Gauge className="w-4 h-4 text-primary" aria-hidden /> {t('dashboardPage.careerProgress')}
-              </h2>
-              <div className="flex items-center gap-4">
-                <ScoreRing score={careerProfile.completionPct} size={76} strokeWidth={7} animate={false} />
-                <p className="text-sm text-muted-foreground flex-1">
-                  {careerProfile.completionPct >= 90
-                    ? t('dashboardPage.progressComplete')
-                    : t('dashboardPage.progressIncomplete')}
-                </p>
-              </div>
-              {careerProfile.completionPct < 90 && (
-                <Link href="/profile" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-                  {t('dashboardPage.completeProfile')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
-                </Link>
-              )}
-            </Card>
-          )}
-
-          {/* Recommendations */}
-          {recommendations.length > 0 && (
-            <Card>
-              <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-                <ListChecks className="w-4 h-4 text-warning" aria-hidden /> {t('dashboardPage.recommendedNextSteps')}
-              </h2>
-              <ul className="space-y-2.5">
-                {recommendations.slice(0, 4).map((rec, i) => (
-                  <li key={i}>
-                    <Link
-                      href={rec.href}
-                      className="flex items-start gap-2 text-sm text-muted-foreground hover:text-primary transition group"
-                    >
-                      <ArrowRight className="w-4 h-4 mt-0.5 text-primary/60 group-hover:translate-x-0.5 rtl-flip transition-transform shrink-0" />
-                      {rec.text}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {/* Missing skills — the recurring gaps across today's top matches */}
-          {missingSkills.length > 0 && (
-            <Card>
-              <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-                <Puzzle className="w-4 h-4 text-accent" aria-hidden /> {t('dashboardPage.missingSkills')}
-              </h2>
-              <div className="flex flex-wrap gap-1.5">
-                {missingSkills.map((skill) => (
-                  <Badge key={skill} tone="slate">{skill}</Badge>
-                ))}
-              </div>
-              <Link href="/radar" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-                {t('dashboardPage.seeSkillImpact')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
-              </Link>
-            </Card>
-          )}
-
-          {/* Top job matches */}
-          <Card padded={false}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <h2 className="font-semibold text-foreground">{t('dashboardPage.topJobMatches')}</h2>
-              <Link href="/jobs" className="text-sm font-medium text-primary hover:underline">
-                {t('dashboardPage.allJobs')}
-              </Link>
-            </div>
-            {topJobs.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-muted-foreground">{t('dashboardPage.jobMatchesEmpty')}</p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {topJobs.map((job) => (
-                  <li key={job.id} className="px-5 py-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-sm text-foreground truncate">{job.title}</p>
-                      {job.match && <Badge tone={scoreTone(job.match.percent)}>{job.match.percent}%</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {job.company} · {job.location}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          {/* Recent achievements — from the Career Vault */}
-          <Card>
-            <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-              <Trophy className="w-4 h-4 text-warning" aria-hidden /> {t('dashboardPage.recentAchievements')}
-            </h2>
-            {recentAchievements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('dashboardPage.noAchievements')}</p>
-            ) : (
-              <ul className="space-y-3">
-                {recentAchievements.map((a) => (
-                  <li key={a._id} className="text-sm text-foreground border-s-2 border-warning/40 ps-3">
-                    <p className="line-clamp-2">{a.text}</p>
-                    {a.metric && <p className="text-xs text-success font-medium mt-0.5">{a.metric}</p>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link href="/profile?tab=vault" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-              {t('dashboardPage.openVault')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
-            </Link>
-          </Card>
-
-          {/* Upcoming tasks — reminders/follow-ups land here once Networking ships */}
-          <Card>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-foreground flex items-center gap-2">
-                <Bell className="w-4 h-4 text-muted-foreground" aria-hidden /> {t('dashboardPage.upcomingTasks')}
-              </h2>
-              <Badge tone="slate">{t('dashboardPage.comingSoon')}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">{t('dashboardPage.upcomingTasksDescription')}</p>
-          </Card>
+          {sidebarOrder
+            .filter((key) => !hiddenWidgets.includes(key))
+            .map((key) => <div key={key}>{renderSidebarWidget(key)}</div>)}
         </div>
       </div>
+
+      <DashboardCustomizeSheet
+        open={customizeOpen}
+        onClose={() => setCustomizeOpen(false)}
+        order={sidebarOrder}
+        hidden={hiddenWidgets}
+        onOrderChange={handleOrderChange}
+        onToggleHidden={handleToggleHidden}
+      />
     </div>
   );
+
+  // ---- Sidebar widget renderers, keyed by WidgetKey for the customize sheet ----
+  function renderSidebarWidget(key: WidgetKey): ReactNode {
+    switch (key) {
+      case 'careerTarget':
+        return renderCareerTarget();
+      case 'dailyChecklist':
+        return renderDailyChecklist();
+      case 'interviewReadiness':
+        return renderInterviewReadiness();
+      case 'careerProgress':
+        return renderCareerProgress();
+      case 'recommendations':
+        return renderRecommendations();
+      case 'missingSkills':
+        return renderMissingSkills();
+      case 'topJobMatches':
+        return renderTopJobMatches();
+      case 'recentAchievements':
+        return renderRecentAchievements();
+      case 'upcomingTasks':
+        return renderUpcomingTasks();
+      default:
+        return null;
+    }
+  }
+
+  function renderCareerTarget(): ReactNode {
+    return (
+      <Card id="target">
+        <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+          <Target className="w-4 h-4 text-primary" aria-hidden /> {t('dashboardPage.careerTarget')}
+        </h2>
+        {editingTarget ? (
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="targetRole" className="block text-xs font-medium text-muted-foreground mb-1">
+                {t('dashboardPage.targetRoleLabel')}
+              </label>
+              <input
+                id="targetRole"
+                value={profile.targetRole}
+                onChange={(e) => setProfile((p) => ({ ...p, targetRole: e.target.value }))}
+                placeholder={t('dashboardPage.targetRolePlaceholder')}
+                className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="industry" className="block text-xs font-medium text-muted-foreground mb-1">
+                {t('dashboardPage.industryLabel')}
+              </label>
+              <input
+                id="industry"
+                value={profile.industry}
+                onChange={(e) => setProfile((p) => ({ ...p, industry: e.target.value }))}
+                placeholder={t('dashboardPage.industryPlaceholder')}
+                className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="careerStage" className="block text-xs font-medium text-muted-foreground mb-1">
+                {t('dashboardPage.careerStageLabel')}
+              </label>
+              <select
+                id="careerStage"
+                value={profile.careerStage}
+                onChange={(e) => setProfile((p) => ({ ...p, careerStage: e.target.value }))}
+                className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">{t('dashboardPage.careerStageNone')}</option>
+                {CAREER_STAGES.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {t(`dashboardPage.careerStage.${stage}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" loading={savingProfile} onClick={saveProfile}>
+                {t('dashboardPage.save')}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditingTarget(false)}>
+                {t('dashboardPage.cancel')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {profile.targetRole ? (
+              <p className="text-sm text-foreground">
+                <span className="font-medium">{profile.targetRole}</span>
+                {profile.industry && <span className="text-muted-foreground"> · {profile.industry}</span>}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('dashboardPage.targetNotSet')}</p>
+            )}
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => setEditingTarget(true)}>
+              {profile.targetRole ? t('dashboardPage.edit') : t('dashboardPage.setTarget')}
+            </Button>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  function renderDailyChecklist(): ReactNode {
+    if (!engagement) return null;
+    return (
+      <Card>
+        <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+          <ListChecks className="w-4 h-4 text-success" aria-hidden /> {t('dashboardPage.dailyChecklist')}
+        </h2>
+        <ul className="space-y-2.5">
+          {engagement.checklist.map((item) => (
+            <li key={item.key} className="flex items-start gap-2.5 text-sm">
+              <span
+                aria-hidden
+                className={`mt-0.5 w-4.5 h-4.5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                  item.done ? 'bg-success text-success-foreground' : 'border-2 border-border-strong'
+                }`}
+              >
+                {item.done ? '✓' : ''}
+              </span>
+              <span className={item.done ? 'text-muted-foreground line-through' : 'text-foreground'}>
+                {t(`dashboardPage.checklist.${item.key}`)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    );
+  }
+
+  function renderInterviewReadiness(): ReactNode {
+    if (!engagement) return null;
+    return (
+      <Card>
+        <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+          <Gauge className="w-4 h-4 text-accent" aria-hidden /> {t('dashboardPage.interviewReadiness')}
+        </h2>
+        <div className="flex items-center gap-4">
+          <ScoreRing score={engagement.readiness.score} size={76} strokeWidth={7} animate={false} />
+          <ul className="flex-1 space-y-1.5">
+            {engagement.readiness.parts
+              .filter((p) => !p.tipKey.endsWith('Strong'))
+              .slice(0, 2)
+              .map((p) => (
+                <li key={p.key} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <ArrowRight className="w-3 h-3 mt-0.5 text-primary/60 rtl-flip shrink-0" aria-hidden />
+                  {t(`dashboardPage.readinessTip.${p.tipKey}`)}
+                </li>
+              ))}
+            {engagement.readiness.parts.every((p) => p.tipKey.endsWith('Strong')) && (
+              <li className="text-xs text-success">{t('dashboardPage.readinessAllStrong')}</li>
+            )}
+          </ul>
+        </div>
+      </Card>
+    );
+  }
+
+  function renderCareerProgress(): ReactNode {
+    if (!careerProfile) return null;
+    return (
+      <Card>
+        <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+          <Gauge className="w-4 h-4 text-primary" aria-hidden /> {t('dashboardPage.careerProgress')}
+        </h2>
+        <div className="flex items-center gap-4">
+          <ScoreRing score={careerProfile.completionPct} size={76} strokeWidth={7} animate={false} />
+          <p className="text-sm text-muted-foreground flex-1">
+            {careerProfile.completionPct >= 90 ? t('dashboardPage.progressComplete') : t('dashboardPage.progressIncomplete')}
+          </p>
+        </div>
+        {careerProfile.completionPct < 90 && (
+          <Link href="/profile" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+            {t('dashboardPage.completeProfile')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
+          </Link>
+        )}
+      </Card>
+    );
+  }
+
+  function renderRecommendations(): ReactNode {
+    if (recommendations.length === 0) return null;
+    return (
+      <Card>
+        <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+          <ListChecks className="w-4 h-4 text-warning" aria-hidden /> {t('dashboardPage.recommendedNextSteps')}
+        </h2>
+        <ul className="space-y-2.5">
+          {recommendations.slice(0, 4).map((rec, i) => (
+            <li key={i}>
+              <Link href={rec.href} className="flex items-start gap-2 text-sm text-muted-foreground hover:text-primary transition group">
+                <ArrowRight className="w-4 h-4 mt-0.5 text-primary/60 group-hover:translate-x-0.5 rtl-flip transition-transform shrink-0" />
+                {rec.text}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    );
+  }
+
+  function renderMissingSkills(): ReactNode {
+    if (missingSkills.length === 0) return null;
+    return (
+      <Card>
+        <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+          <Puzzle className="w-4 h-4 text-accent" aria-hidden /> {t('dashboardPage.missingSkills')}
+        </h2>
+        <div className="flex flex-wrap gap-1.5">
+          {missingSkills.map((skill) => (
+            <Badge key={skill} tone="slate">{skill}</Badge>
+          ))}
+        </div>
+        <Link href="/radar" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+          {t('dashboardPage.seeSkillImpact')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
+        </Link>
+      </Card>
+    );
+  }
+
+  function renderTopJobMatches(): ReactNode {
+    return (
+      <Card padded={false}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="font-semibold text-foreground">{t('dashboardPage.topJobMatches')}</h2>
+          <Link href="/jobs" className="text-sm font-medium text-primary hover:underline">
+            {t('dashboardPage.allJobs')}
+          </Link>
+        </div>
+        {topJobs.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">{t('dashboardPage.jobMatchesEmpty')}</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {topJobs.map((job) => (
+              <li key={job.id} className="px-5 py-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium text-sm text-foreground truncate">{job.title}</p>
+                  {job.match && <Badge tone={scoreTone(job.match.percent)}>{job.match.percent}%</Badge>}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {job.company} · {job.location}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    );
+  }
+
+  function renderRecentAchievements(): ReactNode {
+    return (
+      <Card>
+        <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+          <Trophy className="w-4 h-4 text-warning" aria-hidden /> {t('dashboardPage.recentAchievements')}
+        </h2>
+        {recentAchievements.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('dashboardPage.noAchievements')}</p>
+        ) : (
+          <ul className="space-y-3">
+            {recentAchievements.map((a) => (
+              <li key={a._id} className="text-sm text-foreground border-s-2 border-warning/40 ps-3">
+                <p className="line-clamp-2">{a.text}</p>
+                {a.metric && <p className="text-xs text-success font-medium mt-0.5">{a.metric}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link href="/profile?tab=vault" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+          {t('dashboardPage.openVault')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
+        </Link>
+      </Card>
+    );
+  }
+
+  function renderUpcomingTasks(): ReactNode {
+    return (
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <Bell className="w-4 h-4 text-muted-foreground" aria-hidden /> {t('dashboardPage.upcomingTasks')}
+          </h2>
+          {tasks && tasks.due.length > 0 && <Badge tone="red">{tasks.due.length}</Badge>}
+        </div>
+        {!tasks || (tasks.due.length === 0 && tasks.upcoming.length === 0) ? (
+          <p className="text-sm text-muted-foreground">{t('dashboardPage.noTasks')}</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {[...tasks.due, ...tasks.upcoming].slice(0, 5).map((r) => {
+              const overdue = new Date(r.dueDate).getTime() <= Date.now();
+              return (
+                <li key={r._id} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-foreground line-clamp-2">{r.title}</span>
+                  <Badge tone={overdue ? 'red' : 'slate'} className="shrink-0">
+                    {formatDate(r.dueDate, { month: 'short', day: 'numeric' })}
+                  </Badge>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <Link href="/network?tab=reminders" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+          {t('dashboardPage.manageReminders')} <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
+        </Link>
+      </Card>
+    );
+  }
 }

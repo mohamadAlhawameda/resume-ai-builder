@@ -65,7 +65,7 @@ export default function ExperienceStep({
     <div>
       <button
         onClick={addItem}
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        className="mb-4 px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition"
       >
         {t('builderPage.addExperience')}
       </button>
@@ -88,11 +88,11 @@ export default function ExperienceStep({
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      className="rounded border p-4 shadow-sm bg-white space-y-4 relative"
+                      className="rounded-xl border border-border p-4 shadow-soft bg-surface space-y-4 relative"
                     >
                       <div
                         {...provided.dragHandleProps}
-                        className="cursor-move text-gray-400 text-sm mb-2 select-none"
+                        className="cursor-move text-muted-foreground text-sm mb-2 select-none"
                         aria-label={t('builderPage.dragHandleAria')}
                       >
                         {t('builderPage.dragHandle')}
@@ -143,10 +143,10 @@ export default function ExperienceStep({
                           type="button"
                           onClick={() => getExperienceSuggestions?.(index)}
                           disabled={aiLoading || !exp.description.trim()}
-                          className={`text-sm font-medium ${
+                          className={`text-sm font-medium min-h-11 ${
                             aiLoading
-                              ? "text-gray-400 cursor-not-allowed"
-                              : "text-purple-600 hover:underline"
+                              ? "text-muted-foreground cursor-not-allowed"
+                              : "text-accent hover:underline"
                           }`}
                         >
                           {aiLoading ? t('builderPage.generatingEllipsis') : t('builderPage.aiSuggestionLink')}
@@ -155,7 +155,7 @@ export default function ExperienceStep({
                         <button
                           type="button"
                           onClick={() => removeItem(index)}
-                          className="text-red-600 hover:underline text-sm"
+                          className="text-danger hover:underline text-sm min-h-11"
                         >
                           {t('builderPage.removeButton')}
                         </button>
@@ -171,7 +171,7 @@ export default function ExperienceStep({
                                 e.stopPropagation();
                                 applyExperienceSuggestion?.(index, sugg);
                               }}
-                              className="w-full text-left cursor-pointer bg-gray-100 p-2 rounded hover:bg-gray-200 transition"
+                              className="w-full text-start cursor-pointer bg-muted p-2 rounded-lg hover:bg-surface-hover transition"
                             >
                               {sugg}
                             </button>

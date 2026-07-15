@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { toast } from 'react-toastify';
 import QRCode from 'qrcode';
 import {
@@ -30,6 +31,7 @@ import Modal from '@/components/ui/Modal';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import TagInput from '@/components/ui/TagInput';
+import Tabs from '@/components/ui/Tabs';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
 import type { CareerProfile, VaultItem, ResumeRecord } from '@/lib/types';
@@ -125,34 +127,24 @@ function ProfileContent() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('profilePage.careerProfile')}</h1>
-          <p className="text-slate-500 mt-1 text-sm sm:text-base max-w-2xl">{t('profilePage.subtitle')}</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('profilePage.careerProfile')}</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base max-w-2xl">{t('profilePage.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-end">
-            <p className="text-2xl font-bold text-blue-600">{profile.completionPct}%</p>
-            <p className="text-xs text-slate-500">{t('profilePage.profileComplete')}</p>
+            <p className="text-2xl font-bold text-primary">{profile.completionPct}%</p>
+            <p className="text-xs text-muted-foreground">{t('profilePage.profileComplete')}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1" role="tablist">
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className={clsx(
-              'flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition',
-              tab === id ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300'
-            )}
-          >
-            <Icon className="w-4 h-4" aria-hidden />
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        ariaLabel={t('profilePage.careerProfile')}
+        value={tab}
+        onChange={(v) => setTab(v as Tab)}
+        className="mb-6 pb-1"
+        items={tabs.map(({ id, label, icon }) => ({ value: id, label, icon }))}
+      />
 
       {tab === 'twin' && (
         <TwinTab
@@ -198,8 +190,8 @@ function TwinTab({
       <div className="lg:col-span-2 space-y-6">
         {resumes.length > 0 && (
           <Card>
-            <h2 className="font-semibold text-slate-900 mb-3">{t('profilePage.importFromResumeTitle')}</h2>
-            <p className="text-sm text-slate-500 mb-3">{t('profilePage.importFromResumeDesc')}</p>
+            <h2 className="font-semibold text-foreground mb-3">{t('profilePage.importFromResumeTitle')}</h2>
+            <p className="text-sm text-muted-foreground mb-3">{t('profilePage.importFromResumeDesc')}</p>
             <div className="flex flex-wrap gap-2">
               {resumes.map((r) => (
                 <Button key={r._id} size="sm" variant="outline" loading={busy} onClick={() => onImport(r._id)}>
@@ -211,19 +203,19 @@ function TwinTab({
         )}
 
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-500" aria-hidden /> {t('profilePage.experienceTitle', { n: profile.experience.length })}
+          <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" aria-hidden /> {t('profilePage.experienceTitle', { n: profile.experience.length })}
           </h2>
           {profile.experience.length === 0 ? (
-            <p className="text-sm text-slate-500">{t('profilePage.noExperienceText')}</p>
+            <p className="text-sm text-muted-foreground">{t('profilePage.noExperienceText')}</p>
           ) : (
             <ul className="space-y-3">
               {profile.experience.map((e, i) => (
-                <li key={i} className="border border-slate-100 rounded-xl p-3">
-                  <p className="text-sm font-medium text-slate-900">
+                <li key={i} className="border border-border rounded-xl p-3">
+                  <p className="text-sm font-medium text-foreground">
                     {e.role || t('profilePage.roleFallback')} · {e.company || t('profilePage.companyFallback')}
                   </p>
-                  <p className="text-xs text-slate-400">{e.from} – {e.to}</p>
+                  <p className="text-xs text-muted-foreground">{e.from} – {e.to}</p>
                 </li>
               ))}
             </ul>
@@ -231,16 +223,16 @@ function TwinTab({
         </Card>
 
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Award className="w-4 h-4 text-violet-500" aria-hidden /> {t('profilePage.educationTitle', { n: profile.education.length })}
+          <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Award className="w-4 h-4 text-accent" aria-hidden /> {t('profilePage.educationTitle', { n: profile.education.length })}
           </h2>
           {profile.education.length === 0 ? (
-            <p className="text-sm text-slate-500">{t('profilePage.noEducationText')}</p>
+            <p className="text-sm text-muted-foreground">{t('profilePage.noEducationText')}</p>
           ) : (
             <ul className="space-y-2">
               {profile.education.map((e, i) => (
-                <li key={i} className="text-sm text-slate-700">
-                  {e.degree}, {e.school} <span className="text-slate-400">({e.from}–{e.to})</span>
+                <li key={i} className="text-sm text-foreground">
+                  {e.degree}, {e.school} <span className="text-muted-foreground">({e.from}–{e.to})</span>
                 </li>
               ))}
             </ul>
@@ -250,28 +242,28 @@ function TwinTab({
 
       <div className="space-y-6">
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-3">{t('profilePage.skillsWithEvidenceTitle')}</h2>
+          <h2 className="font-semibold text-foreground mb-3">{t('profilePage.skillsWithEvidenceTitle')}</h2>
           <div className="flex flex-wrap gap-1.5 mb-3">
             {profile.skills.map((s) => (
               <span
                 key={s.name}
-                className="group inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full ps-2.5 pe-1 py-0.5 text-xs font-medium"
+                className="group inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 rounded-full ps-2.5 pe-1 py-0.5 text-xs font-medium"
                 title={s.evidence || undefined}
               >
                 {s.name}
                 {s.source !== 'user' && (
-                  <span className="text-blue-400">·{s.source === 'resume-import' ? t('profilePage.skillSourceImported') : t('profilePage.skillSourceAI')}</span>
+                  <span className="text-primary/70">·{s.source === 'resume-import' ? t('profilePage.skillSourceImported') : t('profilePage.skillSourceAI')}</span>
                 )}
                 <button
                   aria-label={t('profilePage.removeSkillAria', { name: s.name })}
                   onClick={() => onRemoveSkill(s.name)}
-                  className="p-0.5 rounded-full hover:bg-blue-100 transition"
+                  className="p-0.5 rounded-full hover:bg-primary/20 transition"
                 >
                   ×
                 </button>
               </span>
             ))}
-            {profile.skills.length === 0 && <p className="text-sm text-slate-500">{t('profilePage.noSkillsText')}</p>}
+            {profile.skills.length === 0 && <p className="text-sm text-muted-foreground">{t('profilePage.noSkillsText')}</p>}
           </div>
           <div className="flex gap-2">
             <input
@@ -285,7 +277,7 @@ function TwinTab({
                 }
               }}
               placeholder={t('profilePage.addSkillPlaceholder')}
-              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <Button
               size="sm"
@@ -301,17 +293,17 @@ function TwinTab({
         </Card>
 
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-            <FolderGit2 className="w-4 h-4 text-emerald-500" aria-hidden /> {t('profilePage.projectsTitle')}
+          <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+            <FolderGit2 className="w-4 h-4 text-success" aria-hidden /> {t('profilePage.projectsTitle')}
           </h2>
-          <p className="text-sm text-slate-500">{t('profilePage.projectsSavedText', { n: profile.projects.length })}</p>
+          <p className="text-sm text-muted-foreground">{t('profilePage.projectsSavedText', { n: profile.projects.length })}</p>
         </Card>
 
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-            <LanguagesIcon className="w-4 h-4 text-amber-500" aria-hidden /> {t('profilePage.languagesTitle')}
+          <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+            <LanguagesIcon className="w-4 h-4 text-warning" aria-hidden /> {t('profilePage.languagesTitle')}
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             {profile.languages.length > 0 ? profile.languages.map((l) => l.name).join(', ') : t('profilePage.noLanguagesText')}
           </p>
         </Card>
@@ -409,10 +401,10 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
     <div className="space-y-6">
       <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
-            <MessageSquareQuote className="w-4 h-4 text-purple-500" aria-hidden /> {t('profilePage.achievementInterviewTitle')}
+          <h2 className="font-semibold text-foreground mb-1 flex items-center gap-2">
+            <MessageSquareQuote className="w-4 h-4 text-accent" aria-hidden /> {t('profilePage.achievementInterviewTitle')}
           </h2>
-          <p className="text-sm text-slate-500 max-w-xl">{t('profilePage.achievementInterviewDesc')}</p>
+          <p className="text-sm text-muted-foreground max-w-xl">{t('profilePage.achievementInterviewDesc')}</p>
         </div>
         <Button icon={<Wand2 className="w-4 h-4" />} onClick={() => setInterviewOpen(true)}>
           {t('profilePage.startInterview')}
@@ -421,26 +413,26 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
 
       <Card>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-900">{t('profilePage.savedAchievementsTitle', { n: profile.vault.length })}</h2>
+          <h2 className="font-semibold text-foreground">{t('profilePage.savedAchievementsTitle', { n: profile.vault.length })}</h2>
           <Button size="sm" variant="outline" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setAdding(true)}>
             {t('profilePage.addManually')}
           </Button>
         </div>
 
         {adding && (
-          <div className="border border-slate-200 rounded-xl p-4 mb-4 space-y-2">
+          <div className="border border-border rounded-xl p-4 mb-4 space-y-2">
             <textarea
               value={draftText}
               onChange={(e) => setDraftText(e.target.value)}
               rows={2}
               placeholder={t('profilePage.draftTextPlaceholder')}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <input
               value={draftMetric}
               onChange={(e) => setDraftMetric(e.target.value)}
               placeholder={t('profilePage.draftMetricPlaceholder')}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-border-strong rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <div className="flex gap-2">
               <Button size="sm" loading={saving} onClick={addVaultItem}>{t('profilePage.save')}</Button>
@@ -458,15 +450,15 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
         ) : (
           <ul className="space-y-3">
             {profile.vault.map((v: VaultItem) => (
-              <li key={v._id} className="border border-slate-100 rounded-xl p-3 flex items-start justify-between gap-3">
+              <li key={v._id} className="border border-border rounded-xl p-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-slate-800 whitespace-pre-line">{v.text}</p>
+                  <p className="text-sm text-foreground whitespace-pre-line">{v.text}</p>
                   {v.metric && <Badge tone="green" className="mt-1.5">{v.metric}</Badge>}
                 </div>
                 <button
                   aria-label={t('profilePage.removeAria')}
                   onClick={() => removeVaultItem(v._id)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition shrink-0"
+                  className="p-1.5 min-w-11 min-h-11 flex items-center justify-center rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -479,13 +471,13 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
       <Modal open={interviewOpen} onClose={() => setInterviewOpen(false)} title={t('profilePage.interviewModalTitle')} size="lg">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.yourBulletLabel')}</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('profilePage.yourBulletLabel')}</label>
             <textarea
               value={interviewBullet}
               onChange={(e) => setInterviewBullet(e.target.value)}
               rows={2}
               placeholder={t('profilePage.interviewBulletPlaceholder')}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <Button size="sm" className="mt-2" loading={interviewLoading} onClick={startInterview}>
               {t('profilePage.askClarifyingQuestions')}
@@ -493,15 +485,15 @@ function VaultTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
           </div>
 
           {questions.length > 0 && (
-            <div className="space-y-3 border-t border-slate-100 pt-4">
+            <div className="space-y-3 border-t border-border pt-4">
               {questions.map((q, i) => (
                 <div key={i}>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{q}</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">{q}</label>
                   <input
                     value={answers[i] || ''}
                     onChange={(e) => setAnswers((prev) => prev.map((a, idx) => (idx === i ? e.target.value : a)))}
                     placeholder={t('profilePage.answerPlaceholder')}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               ))}
@@ -574,15 +566,15 @@ function GoalsTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
   return (
     <div className="grid lg:grid-cols-2 gap-6 items-start">
       <Card className="space-y-4">
-        <h2 className="font-semibold text-slate-900">{t('profilePage.careerGoalsTitle')}</h2>
+        <h2 className="font-semibold text-foreground">{t('profilePage.careerGoalsTitle')}</h2>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.workingTowardLabel')}</label>
+          <label className="block text-sm font-medium text-foreground mb-1.5">{t('profilePage.workingTowardLabel')}</label>
           <textarea
             value={careerGoals}
             onChange={(e) => setCareerGoals(e.target.value)}
             rows={3}
             placeholder={t('profilePage.careerGoalsPlaceholder')}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <TagInput
@@ -597,15 +589,15 @@ function GoalsTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
 
       <Card>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Target className="w-4 h-4 text-blue-500" aria-hidden /> {t('profilePage.careerGpsTitle')}
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <Target className="w-4 h-4 text-primary" aria-hidden /> {t('profilePage.careerGpsTitle')}
           </h2>
           <Button size="sm" variant="outline" loading={generating} onClick={generateRoadmap}>
             {hasRoadmap ? t('profilePage.regenerate') : t('profilePage.generateRoadmap')}
           </Button>
         </div>
         {!hasRoadmap ? (
-          <p className="text-sm text-slate-500">{t('profilePage.roadmapEmptyText')}</p>
+          <p className="text-sm text-muted-foreground">{t('profilePage.roadmapEmptyText')}</p>
         ) : (
           <div className="space-y-5">
             {(
@@ -616,20 +608,20 @@ function GoalsTab({ profile, onChange }: { profile: CareerProfile; onChange: (p:
               ] as const
             ).map(([label, key]) => (
               <div key={key}>
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{label}</h3>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{label}</h3>
                 <ul className="space-y-1.5">
                   {roadmap[key].map((item, i) => (
                     <li key={i}>
                       <button
                         onClick={() => toggleItem(key, i, !item.done)}
-                        className="w-full flex items-start gap-2 text-start text-sm group"
+                        className="w-full flex items-start gap-2 text-start text-sm group min-h-11"
                       >
                         {item.done ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" aria-hidden />
+                          <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" aria-hidden />
                         ) : (
-                          <Circle className="w-4 h-4 text-slate-300 group-hover:text-blue-400 mt-0.5 shrink-0 transition" aria-hidden />
+                          <Circle className="w-4 h-4 text-border-strong group-hover:text-primary/60 mt-0.5 shrink-0 transition" aria-hidden />
                         )}
-                        <span className={clsx(item.done && 'line-through text-slate-400')}>{item.text}</span>
+                        <span className={clsx(item.done && 'line-through text-muted-foreground')}>{item.text}</span>
                       </button>
                     </li>
                   ))}
@@ -708,36 +700,36 @@ function PassportTab({
     <div className="grid lg:grid-cols-2 gap-6 items-start">
       <Card className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">{t('profilePage.publicPassportTitle')}</h2>
+          <h2 className="font-semibold text-foreground">{t('profilePage.publicPassportTitle')}</h2>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={profile.passport.enabled}
               onChange={(e) => save(e.target.checked)}
-              className="w-5 h-5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
+              className="w-5 h-5 rounded text-primary border-border-strong focus:ring-primary"
             />
-            <span className="text-sm text-slate-600">{profile.passport.enabled ? t('profilePage.public') : t('profilePage.private')}</span>
+            <span className="text-sm text-muted-foreground">{profile.passport.enabled ? t('profilePage.public') : t('profilePage.private')}</span>
           </label>
         </div>
-        <p className="text-sm text-slate-500">{t('profilePage.passportDesc')}</p>
+        <p className="text-sm text-muted-foreground">{t('profilePage.passportDesc')}</p>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.headlineLabel')}</label>
+          <label className="block text-sm font-medium text-foreground mb-1.5">{t('profilePage.headlineLabel')}</label>
           <input
             value={headline}
             onChange={(e) => setHeadline(e.target.value)}
             placeholder={t('profilePage.headlinePlaceholder')}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
         {resumes.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('profilePage.linkResumeLabel')}</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('profilePage.linkResumeLabel')}</label>
             <select
               value={resumeId}
               onChange={(e) => setResumeId(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">{t('profilePage.none')}</option>
               {resumes.map((r) => (
@@ -748,12 +740,12 @@ function PassportTab({
         )}
 
         <div className="flex gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-            <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="w-4 h-4 rounded text-blue-600 border-slate-300" />
+          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+            <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="w-4 h-4 rounded text-primary border-border-strong" />
             {t('profilePage.showProjects')}
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-            <input type="checkbox" checked={showCertifications} onChange={(e) => setShowCertifications(e.target.checked)} className="w-4 h-4 rounded text-blue-600 border-slate-300" />
+          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+            <input type="checkbox" checked={showCertifications} onChange={(e) => setShowCertifications(e.target.checked)} className="w-4 h-4 rounded text-primary border-border-strong" />
             {t('profilePage.showCertifications')}
           </label>
         </div>
@@ -766,15 +758,17 @@ function PassportTab({
       <Card className="flex flex-col items-center text-center gap-4">
         {profile.passport.enabled && publicUrl ? (
           <>
-            {qrDataUrl && <img src={qrDataUrl} alt={t('profilePage.qrAlt')} className="rounded-xl border border-slate-200" />}
-            <p className="text-sm text-slate-600 break-all">{publicUrl}</p>
+            {qrDataUrl && (
+              <Image src={qrDataUrl} alt={t('profilePage.qrAlt')} width={160} height={160} unoptimized className="rounded-xl border border-border" />
+            )}
+            <p className="text-sm text-muted-foreground break-all">{publicUrl}</p>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" icon={<Copy className="w-3.5 h-3.5" />} onClick={copyLink}>{t('profilePage.copyLink')}</Button>
               <a href={publicUrl} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="outline" icon={<Eye className="w-3.5 h-3.5" />}>{t('profilePage.preview')}</Button>
               </a>
             </div>
-            <p className="text-xs text-slate-400">{t('profilePage.viewsSoFar', { n: profile.passport.viewCount })}</p>
+            <p className="text-xs text-muted-foreground">{t('profilePage.viewsSoFar', { n: profile.passport.viewCount })}</p>
           </>
         ) : (
           <EmptyState

@@ -22,29 +22,33 @@ export default function FAQPage() {
   };
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-16">
-      <h1 className="text-4xl font-extrabold text-center text-gray-800 mb-10">{t('faqPage.title')}</h1>
-      <div className="space-y-6">
-        {FAQ_KEYS.map(([qKey, aKey], index) => (
-          <div key={index} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <button
-              className="w-full flex justify-between items-center px-5 py-4 text-left bg-white hover:bg-gray-50 transition"
-              onClick={() => toggle(index)}
-            >
-              <span className="font-medium text-gray-900">{t(qKey)}</span>
-              {openIndex === index ? (
-                <ChevronUp className="w-5 h-5 text-gray-500" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-gray-500" />
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+      <h1 className="text-3xl sm:text-4xl font-extrabold text-center text-foreground mb-8 sm:mb-10">{t('faqPage.title')}</h1>
+      <div className="space-y-4 sm:space-y-6">
+        {FAQ_KEYS.map(([qKey, aKey], index) => {
+          const open = openIndex === index;
+          return (
+            <div key={index} className="border border-border rounded-xl overflow-hidden shadow-soft bg-surface">
+              <button
+                className="w-full flex justify-between items-center gap-3 px-5 py-4 min-h-11 text-start hover:bg-surface-hover transition"
+                onClick={() => toggle(index)}
+                aria-expanded={open}
+              >
+                <span className="font-medium text-foreground">{t(qKey)}</span>
+                {open ? (
+                  <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+                )}
+              </button>
+              {open && (
+                <div className="px-5 pb-4 text-sm text-muted-foreground bg-muted/50 border-t border-border">
+                  {t(aKey)}
+                </div>
               )}
-            </button>
-            {openIndex === index && (
-              <div className="px-5 pb-4 text-sm text-gray-700 bg-gray-50 border-t border-gray-200">
-                {t(aKey)}
-              </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </main>
   );

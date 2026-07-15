@@ -20,6 +20,8 @@ import {
   DollarSign,
   Trash2,
   MessagesSquare,
+  Building2,
+  LayoutGrid,
 } from 'lucide-react';
 import clsx from 'clsx';
 import Card from '@/components/ui/Card';
@@ -29,6 +31,8 @@ import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import TagInput from '@/components/ui/TagInput';
 import MultiSelect from '@/components/ui/MultiSelect';
+import Tabs from '@/components/ui/Tabs';
+import CompanyIntelligencePanel from '@/components/CompanyIntelligence';
 import { api, apiErrorMessage } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
 import {
@@ -43,7 +47,9 @@ import {
   type JobPreferences,
   type SavedJob,
   type SavedJobStatus,
+  type ResumeRecord,
 } from '@/lib/types';
+import GuidedApplyFlow from '@/components/GuidedApplyFlow';
 import { useLocale } from '@/i18n/LocaleProvider';
 
 type Tab = 'recommended' | 'saved' | 'preferences';
@@ -99,6 +105,9 @@ function JobsContent() {
   const [prefs, setPrefs] = useState<JobPreferences>({ ...DEFAULT_JOB_PREFERENCES });
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [intelCompany, setIntelCompany] = useState<string | null>(null);
+  const [resumes, setResumes] = useState<ResumeRecord[]>([]);
+  const [guidedApplyJob, setGuidedApplyJob] = useState<Job | null>(null);
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [descriptionLoading, setDescriptionLoading] = useState<string | null>(null);
   const [busyJob, setBusyJob] = useState<string | null>(null);
@@ -179,6 +188,11 @@ function JobsContent() {
       .then(setSavedJobs)
       .catch(() => {
         /* non-critical for the recommended tab */
+      });
+    api<ResumeRecord[]>('/resume/resumes')
+      .then(setResumes)
+      .catch(() => {
+        /* Guided Apply just prompts to create a resume if this is empty */
       });
     loadJobs(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,23 +344,23 @@ function JobsContent() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('jobsPage.title')}</h1>
-        <p className="text-slate-500 mt-1 text-sm sm:text-base">{t('jobsPage.subtitle')}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('jobsPage.title')}</h1>
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">{t('jobsPage.subtitle')}</p>
       </div>
 
       {sampleData && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-6 text-sm text-amber-800">
+        <div className="flex items-start gap-3 bg-warning/10 border border-warning/25 rounded-2xl px-4 py-3 mb-6 text-sm text-warning">
           <FlaskConical className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
           <p>{t('jobsPage.sampleBanner')}</p>
         </div>
       )}
 
       {!hasProfile && (
-        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-6 text-sm text-blue-800">
-          <FileText className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
+        <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 mb-6 text-sm text-foreground">
+          <FileText className="w-5 h-5 shrink-0 mt-0.5 text-primary" aria-hidden />
           <div className="flex-1">
             <p>{t('jobsPage.noProfileBanner')}</p>
-            <p className="text-xs text-blue-600 mt-0.5">{t('jobsPage.noProfileBannerSub')}</p>
+            <p className="text-xs text-primary mt-0.5">{t('jobsPage.noProfileBannerSub')}</p>
           </div>
           <Button size="sm" onClick={() => router.push('/resume')} className="shrink-0">
             {t('jobsPage.createResume')}
@@ -355,23 +369,13 @@ function JobsContent() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1" role="tablist" aria-label={t('jobsPage.ariaJobSections')}>
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className={clsx(
-              'flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition',
-              tab === id ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300'
-            )}
-          >
-            <Icon className="w-4 h-4" aria-hidden />
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        ariaLabel={t('jobsPage.ariaJobSections')}
+        value={tab}
+        onChange={(v) => setTab(v as Tab)}
+        className="mb-6 pb-1"
+        items={tabs.map(({ id, label, icon }) => ({ value: id, label, icon }))}
+      />
 
       {loading ? (
         <div className="space-y-4">
@@ -388,13 +392,13 @@ function JobsContent() {
               <Card padded={false} className="p-4">
                 <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
                   <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-slate-400 absolute start-3 top-1/2 -translate-y-1/2" aria-hidden />
+                    <Search className="w-4 h-4 text-muted-foreground absolute start-3 top-1/2 -translate-y-1/2" aria-hidden />
                     <input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder={t('jobsPage.searchPlaceholder')}
                       aria-label={t('jobsPage.searchPlaceholder')}
-                      className="w-full ps-9 pe-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full ps-9 pe-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -405,7 +409,7 @@ function JobsContent() {
                         setRegionFilter('any');
                       }}
                       aria-label={t('jobsPage.anyCountry')}
-                      className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="any">{t('jobsPage.anyCountry')}</option>
                       <option value="CA">{t('jobsPage.canada')}</option>
@@ -416,7 +420,7 @@ function JobsContent() {
                         value={regionFilter}
                         onChange={(e) => setRegionFilter(e.target.value)}
                         aria-label={countryFilter === 'CA' ? t('jobsPage.prefProvinces') : t('jobsPage.prefStates')}
-                        className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         <option value="any">{countryFilter === 'CA' ? t('jobsPage.allProvinces') : t('jobsPage.allStates')}</option>
                         {regionOptions.map((r) => (
@@ -430,7 +434,7 @@ function JobsContent() {
                       value={remoteFilter}
                       onChange={(e) => setRemoteFilter(e.target.value)}
                       aria-label={t('jobsPage.anyLocationType')}
-                      className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="any">{t('jobsPage.anyLocationType')}</option>
                       <option value="remote">{t('jobsPage.remote')}</option>
@@ -441,7 +445,7 @@ function JobsContent() {
                       value={minMatch}
                       onChange={(e) => setMinMatch(Number(e.target.value))}
                       aria-label={t('jobsPage.anyMatch')}
-                      className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value={0}>{t('jobsPage.anyMatch')}</option>
                       <option value={50}>{t('jobsPage.matchPlus', { n: 50 })}</option>
@@ -452,7 +456,7 @@ function JobsContent() {
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                       aria-label={t('jobsPage.sortBestMatch')}
-                      className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="match">{t('jobsPage.sortBestMatch')}</option>
                       <option value="date">{t('jobsPage.sortNewest')}</option>
@@ -463,7 +467,7 @@ function JobsContent() {
               </Card>
 
               {totalMatched > 0 && (
-                <p className="text-xs text-slate-500 px-1">
+                <p className="text-xs text-muted-foreground px-1">
                   {t('jobsPage.pageOf', { page, totalPages, total: totalMatched.toLocaleString() })}
                 </p>
               )}
@@ -496,11 +500,11 @@ function JobsContent() {
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="text-base sm:text-lg font-semibold text-slate-900">{job.title}</h3>
+                              <h3 className="text-base sm:text-lg font-semibold text-foreground">{job.title}</h3>
                               {job.isSampleData && <Badge tone="amber">{t('jobsPage.sampleBadge')}</Badge>}
                             </div>
-                            <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-3 flex-wrap">
-                              <span className="font-medium text-slate-700">{job.company}</span>
+                            <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-3 flex-wrap">
+                              <span className="font-medium text-foreground">{job.company}</span>
                               <span className="flex items-center gap-1">
                                 <MapPin className="w-3.5 h-3.5" aria-hidden /> {job.location}
                               </span>
@@ -511,11 +515,11 @@ function JobsContent() {
                                 </span>
                               )}
                               {job.postedAt && (
-                                <span className="text-slate-400">
+                                <span className="text-muted-foreground">
                                   {t('jobsPage.posted', { date: formatDate(job.postedAt) })}
                                 </span>
                               )}
-                              {job.source && <span className="text-slate-400">{t('jobsPage.via', { source: job.source })}</span>}
+                              {job.source && <span className="text-muted-foreground">{t('jobsPage.via', { source: job.source })}</span>}
                             </p>
                             <div className="flex gap-1.5 mt-2 flex-wrap">
                               <Badge tone="slate">{job.remote}</Badge>
@@ -535,12 +539,12 @@ function JobsContent() {
                               >
                                 {job.match.percent}%
                               </div>
-                              <div className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">match</div>
+                              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">match</div>
                             </div>
                           ) : (
                             <div className="text-center shrink-0 max-w-[7rem]">
-                              <div className="text-lg font-bold text-slate-300">—</div>
-                              <div className="text-[11px] text-slate-400 leading-tight">{t('jobsPage.addResumeForScore')}</div>
+                              <div className="text-lg font-bold text-border-strong">—</div>
+                              <div className="text-[11px] text-muted-foreground leading-tight">{t('jobsPage.addResumeForScore')}</div>
                             </div>
                           )}
                         </div>
@@ -561,8 +565,8 @@ function JobsContent() {
                         {job.match && job.match.reasons.length > 0 && (
                           <ul className="mt-3 space-y-1">
                             {job.match.reasons.map((r, j) => (
-                              <li key={j} className="text-xs text-slate-500 flex items-start gap-1.5">
-                                <span className="text-blue-400 mt-0.5">•</span>
+                              <li key={j} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                                <span className="text-primary/60 mt-0.5">•</span>
                                 {r}
                               </li>
                             ))}
@@ -572,7 +576,7 @@ function JobsContent() {
                         {/* Description toggle — fetched lazily on first expand */}
                         <button
                           onClick={() => toggleDescription(job)}
-                          className="mt-3 text-xs font-medium text-slate-500 hover:text-blue-600 flex items-center gap-1 transition"
+                          className="mt-3 text-xs font-medium text-muted-foreground hover:text-primary flex items-center gap-1 transition min-h-11"
                           aria-expanded={expandedJob === job.id}
                         >
                           {expandedJob === job.id ? t('jobsPage.hideDescription') : t('jobsPage.showDescription')}
@@ -587,13 +591,13 @@ function JobsContent() {
                               className="overflow-hidden"
                             >
                               {descriptionLoading === job.id ? (
-                                <div className="mt-2 space-y-2 bg-slate-50 rounded-xl p-4">
+                                <div className="mt-2 space-y-2 bg-muted rounded-xl p-4">
                                   <Skeleton className="h-3.5 w-full" />
                                   <Skeleton className="h-3.5 w-5/6" />
                                   <Skeleton className="h-3.5 w-2/3" />
                                 </div>
                               ) : (
-                                <p className="mt-2 text-sm text-slate-600 whitespace-pre-line bg-slate-50 rounded-xl p-4">
+                                <p className="mt-2 text-sm text-muted-foreground whitespace-pre-line bg-muted rounded-xl p-4">
                                   {descriptions[job.id] || job.description}
                                 </p>
                               )}
@@ -603,7 +607,15 @@ function JobsContent() {
                       </div>
 
                       {/* Actions */}
-                      <div className="px-5 py-3 bg-slate-50/70 border-t border-slate-100 flex flex-wrap gap-2">
+                      <div className="px-5 py-3 bg-muted/50 border-t border-border flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon={<Sparkles className="w-3.5 h-3.5" />}
+                          onClick={() => setGuidedApplyJob(job)}
+                        >
+                          {t('jobsPage.guidedApply')}
+                        </Button>
                         <Button
                           size="sm"
                           variant={savedIds.has(job.id) ? 'success' : 'outline'}
@@ -643,12 +655,20 @@ function JobsContent() {
                         <Button size="sm" variant="ghost" loading={busyJob === job.id} onClick={() => handleAnalyzeAgainstJob(job)}>
                           {t('jobsPage.matchReport')}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Building2 className="w-3.5 h-3.5" />}
+                          onClick={() => setIntelCompany(job.company)}
+                        >
+                          {t('jobsPage.companyInfo')}
+                        </Button>
                         {job.url && (
                           <a
                             href={job.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
+                            className="ms-auto inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:brightness-110 shadow-sm transition"
                           >
                             {t('jobsPage.applyOnSite')} <ExternalLink className="w-3.5 h-3.5" aria-hidden />
                           </a>
@@ -666,7 +686,7 @@ function JobsContent() {
                   </Button>
                   {paginationWindow(page, totalPages).map((p, i) =>
                     p === '…' ? (
-                      <span key={`ellipsis-${i}`} className="px-2 text-sm text-slate-400">
+                      <span key={`ellipsis-${i}`} className="px-2 text-sm text-muted-foreground">
                         …
                       </span>
                     ) : (
@@ -675,8 +695,8 @@ function JobsContent() {
                         onClick={() => goToPage(p as number)}
                         aria-current={p === page ? 'page' : undefined}
                         className={clsx(
-                          'w-9 h-9 rounded-lg text-sm font-medium transition',
-                          p === page ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                          'min-w-11 min-h-11 rounded-lg text-sm font-medium transition',
+                          p === page ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-surface-hover'
                         )}
                       >
                         {p}
@@ -711,13 +731,13 @@ function JobsContent() {
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-slate-900">{saved.job.title}</h3>
+                            <h3 className="font-semibold text-foreground">{saved.job.title}</h3>
                             <Badge tone={statusMeta.tone}>{t(statusMeta.labelKey)}</Badge>
                             {typeof saved.matchPercent === 'number' && (
                               <Badge tone={scoreTone(saved.matchPercent)}>{t('jobsPage.matchScoreLabel', { n: saved.matchPercent })}</Badge>
                             )}
                           </div>
-                          <p className="text-sm text-slate-500 mt-0.5">
+                          <p className="text-sm text-muted-foreground mt-0.5">
                             {saved.job.company} · {saved.job.location}
                             {saved.appliedAt && ` · ${t('jobsPage.appliedOn', { date: formatDate(saved.appliedAt) })}`}
                           </p>
@@ -730,7 +750,7 @@ function JobsContent() {
                             id={`status-${saved._id}`}
                             value={saved.status}
                             onChange={(e) => updateStatus(saved, e.target.value as SavedJobStatus)}
-                            className="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                           >
                             {STATUS_OPTIONS.map((s) => (
                               <option key={s.value} value={s.value}>
@@ -744,7 +764,7 @@ function JobsContent() {
                               target="_blank"
                               rel="noopener noreferrer"
                               aria-label={t('jobsPage.openJobPosting')}
-                              className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                              className="p-2 min-w-11 min-h-11 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
                             >
                               <ExternalLink className="w-4 h-4" />
                             </a>
@@ -752,7 +772,7 @@ function JobsContent() {
                           <button
                             onClick={() => removeSaved(saved)}
                             aria-label={t('jobsPage.removeSavedJob')}
-                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                            className="p-2 min-w-11 min-h-11 flex items-center justify-center rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -760,8 +780,8 @@ function JobsContent() {
                       </div>
 
                       {/* Next-step AI actions matched to where the application is */}
-                      <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2 items-center">
-                        <span className="text-xs text-slate-400 font-medium uppercase tracking-wide mr-1">{t('jobsPage.prepare')}</span>
+                      <div className="mt-3 pt-3 border-t border-border flex flex-wrap gap-2 items-center">
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide me-1">{t('jobsPage.prepare')}</span>
                         {saved.status === 'saved' && (
                           <Button size="sm" variant="outline" icon={<Sparkles className="w-3.5 h-3.5" />} onClick={() => openToolForJob(saved.job, 'cover-letter')}>
                             {t('jobsPage.coverLetter')}
@@ -785,6 +805,17 @@ function JobsContent() {
                         <Button size="sm" variant="ghost" onClick={() => handleAnalyzeAgainstJob(saved.job)}>
                           {t('jobsPage.matchReport')}
                         </Button>
+                        <Button size="sm" variant="ghost" icon={<Building2 className="w-3.5 h-3.5" />} onClick={() => setIntelCompany(saved.job.company)}>
+                          {t('jobsPage.companyInfo')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<LayoutGrid className="w-3.5 h-3.5" />}
+                          onClick={() => router.push(`/workspace/${saved._id}`)}
+                        >
+                          {t('workspacePage.openWorkspace')}
+                        </Button>
                       </div>
                     </Card>
                   );
@@ -798,8 +829,8 @@ function JobsContent() {
             <div className="max-w-3xl space-y-6">
               <Card className="space-y-5">
                 <div>
-                  <h2 className="font-semibold text-slate-900 mb-1">{t('jobsPage.prefsTitle')}</h2>
-                  <p className="text-sm text-slate-500">{t('jobsPage.prefsSubtitle')}</p>
+                  <h2 className="font-semibold text-foreground mb-1">{t('jobsPage.prefsTitle')}</h2>
+                  <p className="text-sm text-muted-foreground">{t('jobsPage.prefsSubtitle')}</p>
                 </div>
                 <TagInput
                   id="pref-titles"
@@ -857,14 +888,14 @@ function JobsContent() {
                 />
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="pref-worktype" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label htmlFor="pref-worktype" className="block text-sm font-medium text-foreground mb-1.5">
                       {t('jobsPage.prefWorkType')}
                     </label>
                     <select
                       id="pref-worktype"
                       value={prefs.workType}
                       onChange={(e) => setPrefs((p) => ({ ...p, workType: e.target.value as JobPreferences['workType'] }))}
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="any">{t('jobsPage.workTypeAny')}</option>
                       <option value="full-time">{t('jobsPage.workTypeFullTime')}</option>
@@ -883,7 +914,7 @@ function JobsContent() {
                     searchable={false}
                   />
                   <div>
-                    <label htmlFor="pref-salmin" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label htmlFor="pref-salmin" className="block text-sm font-medium text-foreground mb-1.5">
                       {t('jobsPage.prefSalaryMin')}
                     </label>
                     <input
@@ -893,11 +924,11 @@ function JobsContent() {
                       value={prefs.salaryMin ?? ''}
                       onChange={(e) => setPrefs((p) => ({ ...p, salaryMin: e.target.value ? Number(e.target.value) : null }))}
                       placeholder="e.g. 70000"
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div>
-                    <label htmlFor="pref-salmax" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label htmlFor="pref-salmax" className="block text-sm font-medium text-foreground mb-1.5">
                       {t('jobsPage.prefSalaryMax')}
                     </label>
                     <input
@@ -907,7 +938,7 @@ function JobsContent() {
                       value={prefs.salaryMax ?? ''}
                       onChange={(e) => setPrefs((p) => ({ ...p, salaryMax: e.target.value ? Number(e.target.value) : null }))}
                       placeholder="e.g. 110000"
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2.5 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -915,37 +946,37 @@ function JobsContent() {
 
               <Card className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-blue-500" aria-hidden />
-                  <h2 className="font-semibold text-slate-900">{t('jobsPage.alertsTitle')}</h2>
+                  <Bell className="w-4 h-4 text-primary" aria-hidden />
+                  <h2 className="font-semibold text-foreground">{t('jobsPage.alertsTitle')}</h2>
                 </div>
                 <label className="flex items-center justify-between gap-4 cursor-pointer">
-                  <span className="text-sm text-slate-700">
+                  <span className="text-sm text-foreground">
                     <span className="font-medium">{t('jobsPage.alertsInApp')}</span>
-                    <span className="block text-xs text-slate-500">{t('jobsPage.alertsInAppHelper')}</span>
+                    <span className="block text-xs text-muted-foreground">{t('jobsPage.alertsInAppHelper')}</span>
                   </span>
                   <input
                     type="checkbox"
                     checked={prefs.alertsEnabled}
                     onChange={(e) => setPrefs((p) => ({ ...p, alertsEnabled: e.target.checked }))}
-                    className="w-5 h-5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
+                    className="w-5 h-5 rounded text-primary border-border-strong focus:ring-primary"
                   />
                 </label>
                 <label className="flex items-center justify-between gap-4 cursor-pointer">
-                  <span className="text-sm text-slate-700">
+                  <span className="text-sm text-foreground">
                     <span className="font-medium">{t('jobsPage.alertsEmail')}</span>
-                    <span className="block text-xs text-slate-500">{t('jobsPage.alertsEmailHelper')}</span>
+                    <span className="block text-xs text-muted-foreground">{t('jobsPage.alertsEmailHelper')}</span>
                   </span>
                   <input
                     type="checkbox"
                     checked={prefs.emailAlerts}
                     onChange={(e) => setPrefs((p) => ({ ...p, emailAlerts: e.target.checked }))}
-                    className="w-5 h-5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
+                    className="w-5 h-5 rounded text-primary border-border-strong focus:ring-primary"
                   />
                 </label>
                 <div>
-                  <label htmlFor="pref-threshold" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label htmlFor="pref-threshold" className="block text-sm font-medium text-foreground mb-1.5">
                     {t('jobsPage.alertThresholdLabel')}{' '}
-                    <span className="text-blue-600 font-bold">{t('jobsPage.matchPlus', { n: prefs.alertThreshold })}</span>
+                    <span className="text-primary font-bold">{t('jobsPage.matchPlus', { n: prefs.alertThreshold })}</span>
                   </label>
                   <input
                     id="pref-threshold"
@@ -955,7 +986,7 @@ function JobsContent() {
                     step={5}
                     value={prefs.alertThreshold}
                     onChange={(e) => setPrefs((p) => ({ ...p, alertThreshold: Number(e.target.value) }))}
-                    className="w-full accent-blue-600"
+                    className="w-full accent-primary"
                   />
                 </div>
               </Card>
@@ -967,6 +998,17 @@ function JobsContent() {
           )}
         </>
       )}
+
+      <CompanyIntelligencePanel company={intelCompany} onClose={() => setIntelCompany(null)} />
+
+      <GuidedApplyFlow
+        job={guidedApplyJob}
+        resumes={resumes}
+        defaultResumeId={resumeId}
+        getFullDescription={getFullDescription}
+        onClose={() => setGuidedApplyJob(null)}
+        onSaved={(saved) => setSavedJobs((prev) => [saved, ...prev.filter((s) => s._id !== saved._id)])}
+      />
     </div>
   );
 }

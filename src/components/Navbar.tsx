@@ -18,6 +18,7 @@ import {
   Radar,
   UserCircle2,
   LayoutGrid,
+  Users,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -43,6 +44,7 @@ const PRIMARY_LINKS = [
 const TOOLS_LINKS = [
   { href: '/analyze', labelKey: 'nav.analyze', icon: ScanSearch },
   { href: '/radar', labelKey: 'nav.radar', icon: Radar },
+  { href: '/network', labelKey: 'nav.network', icon: Users },
   { href: '/tools', labelKey: 'nav.aiTools', icon: Sparkles },
 ];
 

@@ -3,6 +3,7 @@ node_modules/
 
 # Environment variables
 .env
+.env.example
 
 # Logs
 logs/
@@ -21,6 +22,7 @@ Thumbs.db
 
 # Optional: coverage reports if using testing
 coverage/
+tests/
 
 # Optional: compiled output if using Babel or TypeScript
 dist/

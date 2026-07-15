@@ -52,8 +52,8 @@ export default function SectionManager({
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900 mb-2">{t('builderPage.sectionOrderTitle')}</h3>
-        <p className="text-xs text-slate-500 mb-3">{t('builderPage.sectionOrderDesc')}</p>
+        <h3 className="text-sm font-semibold text-foreground mb-2">{t('builderPage.sectionOrderTitle')}</h3>
+        <p className="text-xs text-muted-foreground mb-3">{t('builderPage.sectionOrderDesc')}</p>
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="sections">
             {(provided) => (
@@ -67,19 +67,19 @@ export default function SectionManager({
                           ref={prov.innerRef}
                           {...prov.draggableProps}
                           className={clsx(
-                            'flex items-center gap-2 px-3 py-2.5 bg-white border rounded-xl text-sm transition',
-                            snapshot.isDragging ? 'border-blue-400 shadow-lg' : 'border-slate-200',
+                            'flex items-center gap-2 px-3 py-2.5 bg-surface border rounded-xl text-sm transition',
+                            snapshot.isDragging ? 'border-primary/50 shadow-lg' : 'border-border',
                             hidden && 'opacity-50'
                           )}
                         >
                           <span
                             {...prov.dragHandleProps}
-                            className="text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing"
+                            className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
                             aria-label={t('builderPage.dragToReorderAria', { section: t(SECTION_LABEL_KEYS[key]) })}
                           >
                             <GripVertical className="w-4 h-4" />
                           </span>
-                          <span className={clsx('flex-1 font-medium', hidden ? 'text-slate-400 line-through' : 'text-slate-700')}>
+                          <span className={clsx('flex-1 font-medium', hidden ? 'text-muted-foreground line-through' : 'text-foreground')}>
                             {t(SECTION_LABEL_KEYS[key])}
                           </span>
                           <button
@@ -90,7 +90,7 @@ export default function SectionManager({
                                 ? t('builderPage.showSectionAria', { section: t(SECTION_LABEL_KEYS[key]) })
                                 : t('builderPage.hideSectionAria', { section: t(SECTION_LABEL_KEYS[key]) })
                             }
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                            className="p-1.5 min-w-11 min-h-11 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover transition"
                           >
                             {hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
@@ -107,8 +107,8 @@ export default function SectionManager({
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-1.5">
-          <Palette className="w-4 h-4 text-slate-400" aria-hidden /> {t('builderPage.accentColorTitle')}
+        <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+          <Palette className="w-4 h-4 text-muted-foreground" aria-hidden /> {t('builderPage.accentColorTitle')}
         </h3>
         <div className="flex items-center gap-2 flex-wrap">
           {ACCENT_PRESETS.map((color) => (
@@ -119,12 +119,12 @@ export default function SectionManager({
               onClick={() => onCustomizationChange({ ...customization, accentColor: color })}
               className={clsx(
                 'w-8 h-8 rounded-full border-2 transition-transform hover:scale-110',
-                customization.accentColor === color ? 'border-slate-900 scale-110' : 'border-transparent'
+                customization.accentColor === color ? 'border-foreground scale-110' : 'border-transparent'
               )}
               style={{ backgroundColor: color }}
             />
           ))}
-          <label className="relative w-8 h-8 rounded-full border-2 border-dashed border-slate-300 cursor-pointer overflow-hidden hover:border-slate-500 transition" title={t('builderPage.customColorTitle')}>
+          <label className="relative w-8 h-8 rounded-full border-2 border-dashed border-border-strong cursor-pointer overflow-hidden hover:border-muted-foreground transition" title={t('builderPage.customColorTitle')}>
             <input
               type="color"
               value={customization.accentColor}
@@ -132,21 +132,21 @@ export default function SectionManager({
               className="absolute inset-0 opacity-0 cursor-pointer"
               aria-label={t('builderPage.customAccentColorAria')}
             />
-            <span className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs">+</span>
+            <span className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">+</span>
           </label>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="fontFamily" className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-1.5">
-            <Type className="w-4 h-4 text-slate-400" aria-hidden /> {t('builderPage.fontLabel')}
+          <label htmlFor="fontFamily" className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+            <Type className="w-4 h-4 text-muted-foreground" aria-hidden /> {t('builderPage.fontLabel')}
           </label>
           <select
             id="fontFamily"
             value={customization.fontFamily}
             onChange={(e) => onCustomizationChange({ ...customization, fontFamily: e.target.value as TemplateCustomization['fontFamily'] })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="sans">{t('builderPage.fontSans')}</option>
             <option value="serif">{t('builderPage.fontSerif')}</option>
@@ -154,14 +154,14 @@ export default function SectionManager({
           </select>
         </div>
         <div>
-          <label htmlFor="density" className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-1.5">
-            <AlignVerticalSpaceAround className="w-4 h-4 text-slate-400" aria-hidden /> {t('builderPage.spacingLabel')}
+          <label htmlFor="density" className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+            <AlignVerticalSpaceAround className="w-4 h-4 text-muted-foreground" aria-hidden /> {t('builderPage.spacingLabel')}
           </label>
           <select
             id="density"
             value={customization.density}
             onChange={(e) => onCustomizationChange({ ...customization, density: e.target.value as TemplateCustomization['density'] })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 min-h-11 text-sm border border-border-strong rounded-xl bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="compact">{t('builderPage.spacingCompact')}</option>
             <option value="normal">{t('builderPage.spacingNormal')}</option>
