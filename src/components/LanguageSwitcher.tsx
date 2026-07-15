@@ -4,10 +4,15 @@ import { Globe, Check } from 'lucide-react';
 import { useLocale, LOCALES, type Locale } from '@/i18n/LocaleProvider';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@/components/ui/Menu';
 
+interface LanguageSwitcherProps {
+  className?: string;
+  menuAlign?: 'start' | 'end';
+}
+
 /** Switching languages never navigates or reloads — it's a pure context
  * update, so whatever the user was doing (a half-filled form, a builder
  * draft) is untouched. */
-export default function LanguageSwitcher({ className }: { className?: string }) {
+export default function LanguageSwitcher({ className, menuAlign = 'end' }: LanguageSwitcherProps) {
   const { locale, setLocale, t } = useLocale();
 
   return (
@@ -19,7 +24,7 @@ export default function LanguageSwitcher({ className }: { className?: string }) 
         <Globe className="w-4 h-4 shrink-0" aria-hidden />
         <span>{t(`language.${locale}`)}</span>
       </MenuButton>
-      <MenuItems align="end" width="w-40">
+      <MenuItems align={menuAlign} width="w-40">
         {LOCALES.map((l: Locale) => (
           <MenuItem key={l} onClick={() => setLocale(l)} className="justify-between">
             {t(`language.${l}`)}

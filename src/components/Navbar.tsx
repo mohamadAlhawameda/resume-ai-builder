@@ -18,7 +18,6 @@ import {
   Radar,
   UserCircle2,
   LayoutGrid,
-  Users,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -44,7 +43,6 @@ const PRIMARY_LINKS = [
 const TOOLS_LINKS = [
   { href: '/analyze', labelKey: 'nav.analyze', icon: ScanSearch },
   { href: '/radar', labelKey: 'nav.radar', icon: Radar },
-  { href: '/network', labelKey: 'nav.network', icon: Users },
   { href: '/tools', labelKey: 'nav.aiTools', icon: Sparkles },
 ];
 
@@ -345,8 +343,8 @@ export default function Navbar() {
                 </>
               )}
 
-              <div className="pt-2 mt-2 border-t border-border flex items-center justify-between gap-2">
-                <LanguageSwitcher />
+              <div className="pt-2 mt-2 border-t border-border flex items-center justify-start gap-2">
+                <LanguageSwitcher menuAlign="start" className="shrink-0" />
               </div>
 
               <div className="pt-2 mt-2 border-t border-border">
