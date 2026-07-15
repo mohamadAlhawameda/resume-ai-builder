@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Mail, Github, Linkedin, FileText } from 'lucide-react';
+import { Mail, Linkedin, FileText, Globe2 } from 'lucide-react';
 import { APP_NAME, APP_NAME_PRIMARY, APP_NAME_ACCENT } from '@/lib/config';
 import { useLocale } from '@/i18n/LocaleProvider';
 
@@ -40,8 +40,8 @@ export default function Footer() {
           <div className="flex items-center gap-1 -ms-2 mt-6">
             {[
               { href: 'mailto:alhawameda4@gmail.com', label: 'Email', icon: Mail },
-              { href: 'https://github.com/mohamadAlhawameda', label: 'GitHub', icon: Github },
               { href: 'https://www.linkedin.com/in/mohammad-alhawamdeh/', label: 'LinkedIn', icon: Linkedin },
+              { href: 'https://websolarch.com', label: 'WebSolArch', icon: Globe2 },
             ].map(({ href, label, icon: Icon }) => (
               <a
                 key={label}
@@ -86,7 +86,7 @@ export default function Footer() {
         </nav>
       </div>
 
-      <div className="border-t border-border py-5 text-center text-xs text-muted-foreground">
+      <div className="border-t border-border py-5 px-4 text-center text-xs text-muted-foreground">
         © {new Date().getFullYear()} {APP_NAME}. {t('footer.rights')}
       </div>
     </footer>
