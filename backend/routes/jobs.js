@@ -12,6 +12,7 @@ import Notification from '../models/Notification.js';
 import CareerProfile from '../models/CareerProfile.js';
 import { fetchAllJobs, getJobById, usingSampleData } from '../providers/jobs/index.js';
 import { scoreJobForUser, buildMatchContext, summarizeSkillGaps } from '../utils/jobMatch.js';
+import { rankByMatchPercent } from '../utils/maxHeap.js';
 import { validateBody, jobPreferencesSchema } from '../utils/validate.js';
 import { sendJobAlertEmail, sendApplicationStatusEmail } from '../services/email.js';
 import { matchFamilies, adjacentFamilies } from '../utils/occupationTaxonomy.js';
@@ -133,11 +134,15 @@ router.get('/recommended', async (req, res) => {
     if (minMatch > 0) scored = scored.filter((j) => (j.match?.percent ?? 0) >= minMatch);
 
     const sortBy = req.query.sortBy || 'match';
-    scored.sort((a, b) => {
-      if (sortBy === 'salary') return (b.salaryMax ?? 0) - (a.salaryMax ?? 0);
-      if (sortBy === 'date') return new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime();
-      return (b.match?.percent ?? 0) - (a.match?.percent ?? 0);
-    });
+    if (sortBy === 'salary') {
+      scored.sort((a, b) => (b.salaryMax ?? 0) - (a.salaryMax ?? 0));
+    } else if (sortBy === 'date') {
+      scored.sort((a, b) => new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime());
+    } else {
+      // Default view: rank by match score with a binary max-heap so the
+      // strongest recommendations surface first (see utils/maxHeap.js).
+      scored = rankByMatchPercent(scored);
+    }
 
     // ---- Pagination — 10 lightweight summaries per page by default. ----
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 10, 1), 50);
